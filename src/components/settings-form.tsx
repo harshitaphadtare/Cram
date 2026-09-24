@@ -20,6 +20,7 @@ import { createClient } from "@/lib/supabase/client";
 import { updateProfileName, updateTimezone, updateAvatarUrl } from "@/app/actions/profile";
 import { logOut } from "@/lib/log-out";
 import { checkPassword } from "@/lib/password";
+import { assertUploadSize } from "@/lib/uploads";
 import { PasswordInput, PasswordStrength } from "@/components/auth/password-field";
 
 const TIMEZONES: string[] =
@@ -80,6 +81,7 @@ export function SettingsForm({
     if (!file) return;
     setUploadingAvatar(true);
     try {
+      assertUploadSize(file);
       const formData = new FormData();
       formData.append("file", file);
       const res = await fetch("/api/upload", { method: "POST", body: formData });
@@ -163,7 +165,7 @@ export function SettingsForm({
             <div className="text-sm text-muted-foreground">
               Click your photo to change it.
               <br />
-              PNG, JPG, GIF or WEBP, up to 10MB.
+              PNG, JPG, GIF or WEBP, up to 4 MB.
             </div>
           </div>
 

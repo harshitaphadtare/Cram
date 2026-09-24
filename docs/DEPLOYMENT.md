@@ -73,5 +73,6 @@ update the Supabase Site URL / Redirect URLs and Google origins to the new domai
   in Google AI Studio or lower usage.
 - **Licence**: Cram uses `@blocknote/xl-multi-column` (GPL-3.0). Keep the GitHub repo public, or
   buy a BlockNote licence, if you distribute Cram.
+- **Uploads** are capped at 4 MB per image, because Vercel rejects request bodies over 4.5 MB.
 - **Updates**: every push to `main` redeploys automatically. Pull-request branches get their own
   preview URLs.

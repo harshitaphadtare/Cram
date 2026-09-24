@@ -22,6 +22,7 @@ import type { Theme } from "@blocknote/mantine";
 import { Link2, MoreHorizontal } from "lucide-react";
 import { updatePageContent, renamePage, updatePageLayout } from "@/app/actions/pages";
 import { toast } from "sonner";
+import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import {
   DropdownMenu,
@@ -57,6 +58,12 @@ const editorTheme: Theme = {
 };
 
 async function uploadImage(file: File): Promise<string> {
+  try {
+    assertUploadSize(file);
+  } catch (err) {
+    toast.error((err as Error).message);
+    throw err;
+  }
   const formData = new FormData();
   formData.append("file", file);
 

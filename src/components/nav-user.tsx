@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, LogOut } from "lucide-react";
+import { Compass, Settings, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +16,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { logOut } from "@/lib/log-out";
+import { startProductTour } from "@/components/product-tour";
 
 function initials(name: string | null, email: string) {
   const source = name?.trim() || email;
@@ -62,6 +63,10 @@ export function NavUser({
             <DropdownMenuItem render={<Link href="/app/settings" />}>
               <Settings />
               Account settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={startProductTour}>
+              <Compass />
+              Take the tour
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

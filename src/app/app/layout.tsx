@@ -12,6 +12,7 @@ import { MiniTimer } from "@/components/pomodoro/mini-timer";
 import { getTodayWorkSessionCount } from "@/app/actions/pomodoro";
 import { SubjectsProvider } from "@/components/subjects";
 import { PageTransition } from "@/components/page-transition";
+import { ProductTour } from "@/components/product-tour";
 import { prisma } from "@/lib/prisma";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </SidebarInset>
         <Celebrations items={celebrations} />
         <CommandPalette folders={breadcrumbFolders} />
+        <ProductTour show={!user.onboardedAt} firstName={user.name?.split(" ")[0] ?? null} />
       </SidebarProvider>
       </SubjectsProvider>
     </PomodoroProvider>

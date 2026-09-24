@@ -267,6 +267,7 @@ export function SearchTrigger() {
     <button
       type="button"
       onClick={() => setPaletteOpen(true)}
+      data-tour="search"
       className="flex h-[30px] w-full items-center gap-2 rounded-md px-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
     >
       <Search className="size-4 shrink-0 text-sidebar-foreground/80" />

@@ -172,7 +172,11 @@ export default async function DashboardPage() {
             {firstName ? `, ${firstName.charAt(0).toUpperCase()}${firstName.slice(1)}` : ""}
           </h1>
         </div>
-        <Link href="/app/progress" className="w-full rounded-lg px-1 py-1 transition-opacity hover:opacity-80 sm:w-64">
+        <Link
+          href="/app/progress"
+          data-tour="level"
+          className="w-full rounded-lg px-1 py-1 transition-opacity hover:opacity-80 sm:w-64"
+        >
           <LevelProgress xp={user.xp} />
         </Link>
       </header>
@@ -180,7 +184,10 @@ export default async function DashboardPage() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="cram-stagger flex min-w-0 flex-col gap-8">
           {/* Today: goal ring + streak */}
-          <section className="flex flex-col gap-6 rounded-xl border bg-card p-5 sm:flex-row sm:items-center sm:gap-8">
+          <section
+            data-tour="goal"
+            className="flex flex-col gap-6 rounded-xl border bg-card p-5 sm:flex-row sm:items-center sm:gap-8"
+          >
             <div className="flex items-center gap-4">
               <GoalRing minutes={todayMinutes} goal={user.dailyGoalMin} />
               <div className="flex flex-col gap-0.5">
@@ -219,7 +226,10 @@ export default async function DashboardPage() {
           </section>
 
           {/* Next step */}
-          <section className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/[0.04] p-5 sm:flex-row sm:items-center">
+          <section
+            data-tour="next-step"
+            className="flex flex-col gap-4 rounded-xl border border-primary/25 bg-primary/[0.04] p-5 sm:flex-row sm:items-center"
+          >
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               {nextStep.icon}
             </span>

@@ -59,6 +59,8 @@ model User {
   /// Last moment we credited note-editing time; edits within a few minutes of this count as study time.
   lastEditAt        DateTime?
   showOnLeaderboard Boolean   @default(true)
+  /// Set when the user finishes or skips the product tour; null means show it.
+  onboardedAt       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 

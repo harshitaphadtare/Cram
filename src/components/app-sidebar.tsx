@@ -34,7 +34,7 @@ import type { VisibleFolder } from "@/lib/data/folders";
 const NAV_ITEMS = [
   { href: "/app", label: "Home", icon: House },
   { href: "/app/planner", label: "Planner", icon: CalendarCheck2 },
-  { href: "/app/pomodoro", label: "Pomodoro", icon: Timer },
+  { href: "/app/pomodoro", label: "Pomodoro", icon: Timer, tour: "pomodoro" },
   { href: "/app/quizzes", label: "Quiz history", icon: History },
   { href: "/app/progress", label: "Progress", icon: Trophy },
 ];
@@ -72,7 +72,7 @@ export function AppSidebar({
                 const active =
                   item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href);
                 return (
-                  <SidebarMenuItem key={item.href}>
+                  <SidebarMenuItem key={item.href} data-tour={"tour" in item ? item.tour : undefined}>
                     <SidebarMenuButton
                       isActive={active}
                       tooltip={item.label}
@@ -90,7 +90,7 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="mt-3">
+        <SidebarGroup className="mt-3" data-tour="folders">
           <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/60">
             Folders
           </SidebarGroupLabel>

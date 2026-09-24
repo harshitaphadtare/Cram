@@ -1,5 +1,12 @@
 import { cn } from "@/lib/utils";
-import { formatGoal } from "@/lib/goals";
+
+/** "45m", "1h", "1h 5m": compact enough to sit inside a small ring. */
+function compactMinutes(m: number) {
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest ? `${h}h ${rest}m` : `${h}h`;
+}
 
 /** Apple-Activity-style ring: fills as today's study minutes approach the daily goal. */
 export function GoalRing({
@@ -40,9 +47,14 @@ export function GoalRing({
           )}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-        <span className="text-xl font-semibold tabular-nums">{minutes}</span>
-        <span className="mt-1 text-[11px] text-muted-foreground">of {formatGoal(goal)}</span>
+      {/* Label scales with the ring so it stays centred and proportional at any size. */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="leading-none font-semibold tabular-nums" style={{ fontSize: Math.round(size * 0.19) }}>
+          {compactMinutes(minutes)}
+        </span>
+        <span className="mt-[0.35em] leading-none text-muted-foreground" style={{ fontSize: Math.max(9, Math.round(size * 0.105)) }}>
+          of {compactMinutes(goal)}
+        </span>
       </div>
     </div>
   );

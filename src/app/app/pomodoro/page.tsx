@@ -23,7 +23,6 @@ export default async function PomodoroPage() {
       tasks={tasks}
       todayMinutes={Math.floor((todayLog?.seconds ?? 0) / 60)}
       goalMinutes={user.dailyGoalMin}
-      streak={user.streakCount}
     />
   );
 }

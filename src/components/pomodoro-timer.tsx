@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
-import { Flame, Pause, Play, RotateCcw, Settings, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, RotateCcw, Settings, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { GoalRing } from "@/components/gamification/goal-ring";
 import { cn } from "@/lib/utils";
 import { formatGoal } from "@/lib/goals";
 import { formatClock, MODE_LABEL, usePomodoro, type Mode } from "@/components/pomodoro/pomodoro-provider";
 
+const VIEW = 300;
+const STROKE = 6;
+const R = (VIEW - STROKE * 2) / 2 - 6;
+const C = 2 * Math.PI * R;
 const MODES: Mode[] = ["WORK", "SHORT_BREAK", "LONG_BREAK"];
 
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null;
   return !!el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
-}
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return <kbd className="rounded border px-1 py-px font-sans text-[10px] leading-none text-muted-foreground">{children}</kbd>;
 }
 
 function TimerSettings() {
@@ -30,12 +32,12 @@ function TimerSettings() {
     <Popover>
       <PopoverTrigger
         render={
-          <Button variant="ghost" size="icon-sm" aria-label="Timer settings" className="text-muted-foreground">
+          <Button variant="ghost" size="icon-lg" aria-label="Timer settings" className="rounded-full text-muted-foreground">
             <Settings />
           </Button>
         }
       />
-      <PopoverContent align="end" className="w-72">
+      <PopoverContent className="w-72">
         <div className="flex flex-col gap-4">
           <p className="text-sm font-medium">Timer settings</p>
           <div className="grid grid-cols-3 gap-2">
@@ -79,196 +81,229 @@ function TimerSettings() {
   );
 }
 
-function TaskSelect({ tasks }: { tasks: { id: string; title: string }[] }) {
-  const { taskId, setTaskId } = usePomodoro();
-  if (tasks.length === 0) return null;
+/** One card with everything about today's session: goal, cycle, and the task being worked on. */
+function TodayCard({
+  tasks,
+  todayMinutes,
+  goalMinutes,
+  className,
+  compact = false,
+}: {
+  tasks: { id: string; title: string }[];
+  todayMinutes: number;
+  goalMinutes: number;
+  className?: string;
+  /** Single-row version for narrower screens, where there's no room beside the timer. */
+  compact?: boolean;
+}) {
+  const { settings, sessionsToday, taskId, setTaskId } = usePomodoro();
+  const cyclePosition = sessionsToday % settings.longBreakInterval;
+  const untilLongBreak = settings.longBreakInterval - cyclePosition;
+  const left = Math.max(0, goalMinutes - todayMinutes);
+
+  const taskPicker =
+    tasks.length === 0 ? (
+      <p className="text-sm text-muted-foreground">
+        No open tasks.{" "}
+        <Link href="/app/planner" className="text-foreground underline-offset-4 hover:underline">
+          Add one
+        </Link>
+      </p>
+    ) : (
+      <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
+        <SelectTrigger className={compact ? "w-48" : "w-full"}>
+          <SelectValue placeholder="Choose a task" />
+        </SelectTrigger>
+        <SelectContent>
+          {tasks.map((t) => (
+            <SelectItem key={t.id} value={t.id}>
+              {t.title}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+
+  if (compact) {
+    return (
+      <section className={cn("flex items-center gap-4 rounded-xl border bg-card py-2 pr-2 pl-3 text-sm", className)}>
+        <GoalRing minutes={todayMinutes} goal={goalMinutes} size={40} stroke={4} />
+        <div className="leading-tight">
+          <p className="font-medium">{left === 0 ? "Goal complete" : `${formatGoal(left)} to go`}</p>
+          <p className="text-muted-foreground">Long break in {untilLongBreak}</p>
+        </div>
+        <span className="h-8 w-px bg-border" />
+        {taskPicker}
+      </section>
+    );
+  }
+
   return (
-    <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
-      <SelectTrigger size="sm" className="max-w-56 border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-accent hover:text-foreground">
-        <SelectValue placeholder="Link a task" />
-      </SelectTrigger>
-      <SelectContent align="end">
-        {tasks.map((t) => (
-          <SelectItem key={t.id} value={t.id}>
-            {t.title}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <section className={cn("w-72 rounded-xl border bg-card", className)}>
+      <div className="flex items-center gap-4 p-4">
+        <GoalRing minutes={todayMinutes} goal={goalMinutes} size={64} stroke={6} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Today&apos;s goal</p>
+          <p className="text-sm text-muted-foreground">{left === 0 ? "Complete" : `${formatGoal(left)} to go`}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t px-4 py-3 text-sm">
+        <div>
+          <p className="font-medium tabular-nums">
+            {sessionsToday} {sessionsToday === 1 ? "session" : "sessions"}
+          </p>
+          <p className="text-muted-foreground">Long break in {untilLongBreak}</p>
+        </div>
+        <div className="flex gap-1">
+          {Array.from({ length: settings.longBreakInterval }, (_, i) => (
+            <span
+              key={i}
+              className={cn("h-1.5 w-4 rounded-full transition-colors", i < cyclePosition ? "bg-primary" : "bg-muted-foreground/20")}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t p-4">
+        <p className="mb-2 text-sm font-medium">Working on</p>
+        {taskPicker}
+      </div>
+    </section>
   );
 }
 
 /**
- * The Pomodoro page's view of the app-wide timer (state lives in PomodoroProvider).
- *
- * Deliberately quiet: large light numerals, a segmented progress bar (one segment per session in
- * the cycle, the current one filling), and a single round play button. The page is pinned to the
- * exact space left under the top bar, so it never scrolls. Space starts/pauses, R resets, S skips.
+ * The Pomodoro page's view of the app-wide timer (state lives in PomodoroProvider). Pinned to the
+ * exact height left under the top bar, so it never scrolls. Space starts/pauses and R resets.
  */
 export function PomodoroTimer({
   tasks,
   todayMinutes,
   goalMinutes,
-  streak,
 }: {
   tasks: { id: string; title: string }[];
   todayMinutes: number;
   goalMinutes: number;
-  streak: number;
 }) {
-  const { settings, mode, secondsLeft, totalSeconds, isRunning, sessionsToday, startPause, reset, switchMode, taskId } =
-    usePomodoro();
-
-  const isBreak = mode !== "WORK";
-  const skip = () =>
-    switchMode(
-      isBreak ? "WORK" : (sessionsToday + 1) % settings.longBreakInterval === 0 ? "LONG_BREAK" : "SHORT_BREAK",
-    );
+  const { mode, secondsLeft, totalSeconds, isRunning, sessionsToday, startPause, reset, switchMode } = usePomodoro();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
-      const k = e.key.toLowerCase();
       if (e.code === "Space") {
         e.preventDefault();
         startPause();
-      } else if (k === "r") reset();
-      else if (k === "s") skip();
+      } else if (e.key.toLowerCase() === "r") reset();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, [startPause, reset]);
 
-  const elapsed = totalSeconds > 0 ? 1 - secondsLeft / totalSeconds : 0;
-  const cyclePosition = sessionsToday % settings.longBreakInterval;
+  const isBreak = mode !== "WORK";
+  const remaining = totalSeconds > 0 ? secondsLeft / totalSeconds : 1;
   const started = secondsLeft < totalSeconds;
-  const taskTitle = tasks.find((t) => t.id === taskId)?.title;
-
-  const status = isRunning
-    ? isBreak
-      ? "Step away from the screen"
-      : taskTitle
-        ? `Focusing on ${taskTitle}`
-        : "Focusing"
-    : started
-      ? "Paused"
-      : isBreak
-        ? "Time for a break"
-        : "Ready to focus";
+  const accent = isBreak ? "var(--chart-3)" : "var(--primary)";
+  const angle = remaining * 2 * Math.PI - Math.PI / 2;
 
   return (
     // Exactly the height left under the 84px top bar and the layout padding, so nothing scrolls.
-    <div className="-mb-10 flex h-[calc(100svh-8.25rem)] w-full flex-col md:h-[calc(100svh-9.25rem)]">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-0.5 rounded-lg bg-muted p-0.5">
+    <div className="relative -mb-10 flex h-[calc(100svh-8.25rem)] w-full flex-col md:h-[calc(100svh-9.25rem)]">
+      <TodayCard
+        tasks={tasks}
+        todayMinutes={todayMinutes}
+        goalMinutes={goalMinutes}
+        className="absolute top-0 left-0 z-10 hidden xl:block"
+      />
+
+      <div className="flex justify-center">
+        <div className="flex gap-1 rounded-full border bg-muted/50 p-1">
           {MODES.map((m) => (
             <button
               key={m}
               onClick={() => switchMode(m)}
               className={cn(
-                "relative rounded-md px-3 py-1 text-sm transition-colors",
-                mode === m ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
+                "relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+                mode === m ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {mode === m && (
                 <motion.span
                   layoutId="pomodoro-mode"
-                  className="absolute inset-0 rounded-md bg-background shadow-sm"
-                  transition={{ type: "spring", stiffness: 480, damping: 38 }}
+                  className="absolute inset-0 rounded-full bg-background shadow-sm ring-1 ring-border"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               )}
               <span className="relative">{MODE_LABEL[m]}</span>
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
-          <TaskSelect tasks={tasks} />
-          <TimerSettings />
-        </div>
       </div>
 
-      {/* Stage */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[clamp(1.25rem,4svh,2.75rem)]">
-        <div data-tour="pomodoro-timer" className="flex flex-col items-center">
-          <p className="text-sm text-muted-foreground">{status}</p>
-          <motion.p
-            key={mode}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mt-1 text-[clamp(4.5rem,19svh,10rem)] leading-none font-extralight tracking-[-0.04em] tabular-nums"
-          >
-            {formatClock(secondsLeft)}
-          </motion.p>
-        </div>
-
-        {/* Segmented progress: one segment per session in the cycle; breaks get a single bar. */}
-        <div className="flex w-[min(28rem,80vw)] flex-col items-center gap-2.5">
-          <div className="flex w-full gap-1.5">
-            {(isBreak ? [0] : Array.from({ length: settings.longBreakInterval }, (_, i) => i)).map((i) => {
-              const fill = isBreak ? elapsed : i < cyclePosition ? 1 : i === cyclePosition ? elapsed : 0;
-              return (
-                <span key={i} className="h-1 flex-1 overflow-hidden rounded-full bg-muted-foreground/15">
-                  <span
-                    className={cn("block h-full rounded-full transition-[width] duration-500 ease-linear", isBreak ? "bg-chart-3" : "bg-foreground")}
-                    style={{ width: `${fill * 100}%` }}
-                  />
-                </span>
-              );
-            })}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[clamp(1.25rem,4svh,2.5rem)]">
+        <div data-tour="pomodoro-timer" className="relative aspect-square" style={{ width: "min(21rem, 50svh, 84vw)" }}>
+          <div
+            aria-hidden
+            className={cn("absolute inset-[15%] rounded-full blur-3xl transition-opacity duration-700", isRunning ? "opacity-25" : "opacity-10")}
+            style={{ background: accent }}
+          />
+          <svg viewBox={`0 0 ${VIEW} ${VIEW}`} className="relative size-full">
+            <circle cx={VIEW / 2} cy={VIEW / 2} r={R} fill="none" strokeWidth={STROKE} className="stroke-muted-foreground/12" />
+            <circle
+              cx={VIEW / 2}
+              cy={VIEW / 2}
+              r={R}
+              fill="none"
+              strokeWidth={STROKE}
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - remaining)}
+              transform={`rotate(-90 ${VIEW / 2} ${VIEW / 2})`}
+              style={{ stroke: accent }}
+              className="transition-[stroke-dashoffset] duration-300 ease-linear"
+            />
+            {remaining > 0.002 && (
+              <circle
+                cx={VIEW / 2 + R * Math.cos(angle)}
+                cy={VIEW / 2 + R * Math.sin(angle)}
+                r={STROKE}
+                style={{ fill: accent }}
+              />
+            )}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-sm text-muted-foreground">
+              {isBreak ? MODE_LABEL[mode] : `Session ${sessionsToday + 1}`}
+            </span>
+            <span className="mt-2 text-[clamp(3rem,10svh,4.5rem)] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+              {formatClock(secondsLeft)}
+            </span>
+            <span className="mt-3 text-sm text-muted-foreground">
+              {isRunning ? (isBreak ? "Rest your eyes" : "Stay with it") : started ? "Paused" : isBreak ? "Take a breather" : "Ready to focus"}
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {isBreak ? MODE_LABEL[mode] : `Session ${cyclePosition + 1} of ${settings.longBreakInterval}`}
-          </p>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-6">
-          <Button variant="ghost" size="icon-lg" onClick={reset} aria-label="Reset (R)" title="Reset (R)" className="rounded-full text-muted-foreground">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon-lg" onClick={reset} aria-label="Reset timer" className="rounded-full text-muted-foreground">
             <RotateCcw />
           </Button>
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.94 }}
-            onClick={startPause}
-            aria-label={isRunning ? "Pause (Space)" : "Start (Space)"}
-            className="flex size-16 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-opacity hover:opacity-90"
-          >
-            {isRunning ? <Pause className="size-6" fill="currentColor" /> : <Play className="ml-0.5 size-6" fill="currentColor" />}
-          </motion.button>
-          <Button
-            variant="ghost"
-            size="icon-lg"
-            onClick={skip}
-            aria-label={isBreak ? "Skip break (S)" : "Skip to break (S)"}
-            title={isBreak ? "Skip break (S)" : "Skip to break (S)"}
-            className="rounded-full text-muted-foreground"
-          >
-            <SkipForward />
-          </Button>
+          <motion.div whileTap={{ scale: 0.96 }}>
+            <Button
+              size="lg"
+              className="h-12 w-40 gap-2 rounded-full text-[15px]"
+              onClick={startPause}
+              style={isBreak ? { background: "var(--chart-3)" } : undefined}
+            >
+              {isRunning ? <Pause className="size-4" /> : <Play className="size-4" />}
+              {isRunning ? "Pause" : started ? "Resume" : "Start"}
+            </Button>
+          </motion.div>
+          <TimerSettings />
         </div>
-      </div>
 
-      {/* Quiet footer */}
-      <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 pb-1 text-xs text-muted-foreground sm:justify-between">
-        <div className="flex items-center gap-4">
-          <span>
-            <span className="font-medium text-foreground tabular-nums">{formatGoal(todayMinutes)}</span> of{" "}
-            {formatGoal(goalMinutes)} today
-          </span>
-          <span>
-            <span className="font-medium text-foreground tabular-nums">{sessionsToday}</span>{" "}
-            {sessionsToday === 1 ? "session" : "sessions"}
-          </span>
-          <span className="flex items-center gap-1">
-            <Flame className={cn("size-3.5", streak > 0 ? "fill-streak/25 text-streak" : "")} />
-            <span className="font-medium text-foreground tabular-nums">{streak}</span> day streak
-          </span>
-        </div>
-        <div className="hidden items-center gap-1.5 sm:flex">
-          <Kbd>Space</Kbd> start <Kbd>R</Kbd> reset <Kbd>S</Kbd> skip
-        </div>
+        {/* Below xl there's no room beside the timer; a one-row version sits underneath instead. */}
+        <TodayCard tasks={tasks} todayMinutes={todayMinutes} goalMinutes={goalMinutes} compact className="xl:hidden" />
       </div>
     </div>
   );

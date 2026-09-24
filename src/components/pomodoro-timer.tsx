@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
-import { Pause, Play, RotateCcw, Settings, Volume2, VolumeX } from "lucide-react";
+import { ListTodo, Pause, Play, Plus, RotateCcw, Settings, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -81,21 +81,11 @@ function TimerSettings() {
   );
 }
 
-/** One labelled cell of the today block. */
-function Cell({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5 px-5 py-3.5">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <div className="flex min-h-7 items-center gap-2 text-sm">{children}</div>
-    </div>
-  );
-}
-
 /**
- * Today's context in one block under the controls: goal, session cycle and the task in focus,
- * as three equal labelled cells. Stacks vertically on narrow screens.
+ * Today's context as a status pill that mirrors the mode switcher at the top: goal progress,
+ * long-break cycle and the task in focus, one line, icons instead of labels.
  */
-function TodayBlock({
+function StatusPill({
   tasks,
   todayMinutes,
   goalMinutes,
@@ -108,65 +98,74 @@ function TodayBlock({
   const cyclePosition = sessionsToday % settings.longBreakInterval;
   const untilLongBreak = settings.longBreakInterval - cyclePosition;
   const left = Math.max(0, goalMinutes - todayMinutes);
+  const segment = "flex h-9 items-center gap-2 rounded-full px-3.5 text-sm whitespace-nowrap";
 
   return (
-    <section className="grid w-[min(42rem,100%)] divide-y overflow-hidden rounded-xl border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-      <Cell label="Today's goal">
-        <GoalRing minutes={todayMinutes} goal={goalMinutes} size={20} stroke={3} showLabel={false} />
-        <span className="truncate">
-          {left === 0 ? (
-            "Complete"
-          ) : (
-            <>
-              <span className="font-medium">{formatGoal(left)}</span>
-              <span className="text-muted-foreground"> to go</span>
-            </>
-          )}
-        </span>
-      </Cell>
+    <div className="flex max-w-full flex-wrap items-center justify-center gap-1 rounded-3xl border bg-muted/50 p-1 sm:flex-nowrap sm:rounded-full">
+      <div className={segment} title="Today's study goal">
+        <GoalRing minutes={todayMinutes} goal={goalMinutes} size={16} stroke={2.5} showLabel={false} />
+        {left === 0 ? (
+          <span className="font-medium">Goal complete</span>
+        ) : (
+          <span>
+            <span className="font-medium">{formatGoal(left)}</span>
+            <span className="text-muted-foreground"> left today</span>
+          </span>
+        )}
+      </div>
 
-      <Cell label="Long break">
-        <span className="flex gap-1" aria-label={`${cyclePosition} of ${settings.longBreakInterval} sessions done`}>
+      <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+
+      <div
+        className={segment}
+        title={`${cyclePosition} of ${settings.longBreakInterval} sessions until a long break`}
+      >
+        <span className="flex gap-[3px]">
           {Array.from({ length: settings.longBreakInterval }, (_, i) => (
             <span
               key={i}
               className={cn(
-                "size-2 rounded-full transition-colors",
-                i < cyclePosition ? "bg-primary" : "border border-muted-foreground/40",
+                "size-1.5 rounded-full transition-colors",
+                i < cyclePosition ? "bg-primary" : "bg-muted-foreground/30",
               )}
             />
           ))}
         </span>
-        <span className="truncate">
-          <span className="font-medium">In {untilLongBreak}</span>
-          <span className="text-muted-foreground"> {untilLongBreak === 1 ? "session" : "sessions"}</span>
+        <span>
+          <span className="text-muted-foreground">Long break in </span>
+          <span className="font-medium">{untilLongBreak}</span>
         </span>
-      </Cell>
+      </div>
 
-      <Cell label="Working on">
-        {tasks.length === 0 ? (
-          <Link href="/app/planner" className="truncate font-medium underline-offset-4 hover:underline">
-            Add a task
-          </Link>
-        ) : (
-          <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
-            <SelectTrigger
-              size="sm"
-              className="-ml-2 w-[calc(100%+0.5rem)] border-transparent bg-transparent px-2 font-medium shadow-none hover:bg-accent"
-            >
-              <SelectValue placeholder="Choose a task" />
-            </SelectTrigger>
-            <SelectContent>
-              {tasks.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </Cell>
-    </section>
+      <span className="hidden h-4 w-px bg-border sm:block" aria-hidden />
+
+      {tasks.length === 0 ? (
+        <Link
+          href="/app/planner"
+          className={cn(segment, "text-muted-foreground transition-colors hover:bg-background hover:text-foreground")}
+        >
+          <Plus className="size-3.5" />
+          Add a task
+        </Link>
+      ) : (
+        <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
+          <SelectTrigger
+            size="sm"
+            className="h-9 max-w-56 gap-2 rounded-full border-transparent bg-transparent px-3.5 shadow-none hover:bg-background data-[popup-open]:bg-background dark:bg-transparent dark:hover:bg-background"
+          >
+            <ListTodo className="size-3.5 text-muted-foreground" />
+            <SelectValue placeholder="Pick a task" />
+          </SelectTrigger>
+          <SelectContent>
+            {tasks.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
   );
 }
 
@@ -286,7 +285,7 @@ export function PomodoroTimer({
         <TimerSettings />
       </div>
 
-      <TodayBlock tasks={tasks} todayMinutes={todayMinutes} goalMinutes={goalMinutes} />
+      <StatusPill tasks={tasks} todayMinutes={todayMinutes} goalMinutes={goalMinutes} />
     </div>
   );
 }

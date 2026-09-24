@@ -20,8 +20,11 @@ export async function getCurrentUser(): Promise<User | null> {
     create: {
       id: authUser.id,
       email: authUser.email!,
-      name: (authUser.user_metadata?.name as string | undefined) ?? null,
-      avatarUrl: (authUser.user_metadata?.avatar_url as string | undefined) ?? null,
+      // Email sign-up stores `name`; Google/Microsoft provide `full_name`/`name` and `avatar_url`/`picture`.
+      name:
+        ((authUser.user_metadata?.name ?? authUser.user_metadata?.full_name) as string | undefined) ?? null,
+      avatarUrl:
+        ((authUser.user_metadata?.avatar_url ?? authUser.user_metadata?.picture) as string | undefined) ?? null,
     },
   });
 

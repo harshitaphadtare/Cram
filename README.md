@@ -101,9 +101,8 @@ Fill in the six values. `.env` is git-ignored; never commit it.
 
 ### 4. Install and migrate
 ```bash
-npm install
-npx prisma migrate deploy
-npx prisma generate
+npm install          # also runs `prisma generate`
+npm run db:deploy    # applies database migrations
 ```
 
 ### 5. Run
@@ -111,6 +110,12 @@ npx prisma generate
 npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email, and you're in.
+
+## Guides
+
+- [Google & Microsoft sign-in setup](docs/AUTH-PROVIDERS.md)
+- [Manual test checklist](docs/TESTING.md)
+- [Deploying to Vercel + Supabase](docs/DEPLOYMENT.md)
 
 ## Scripts
 
@@ -121,7 +126,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email
 | `npm run start` | Serve the production build |
 | `npm run lint` | ESLint |
 | `npx prisma migrate dev --name <change>` | Create a new migration after editing `prisma/schema.prisma` |
-| `npx prisma migrate deploy` | Apply pending migrations (safe: never resets data) |
+| `npm run db:deploy` | Apply pending migrations (safe: never resets data) |
 
 ## Project structure
 

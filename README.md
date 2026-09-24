@@ -1,79 +1,151 @@
-# Cram — your study buddy
+# Cram
 
-Notion-style notes organized by folder, AI-generated quizzes (Gemini), Duolingo-style streaks, a
-Todoist-style daily planner, and a Pomodoro timer — all in one calm, focused workspace. Folders
-can be shared with friends with Viewer / Editor / Admin permissions.
+**Study a little every day. Remember it for good.**
+
+Cram is a study workspace for students: Notion-style notes organised by subject, AI quizzes
+generated from your own notes, spaced review that tells you what you're about to forget, a
+focus timer, and a gamified streak/XP system designed to bring you back every day.
+
+## Features
+
+### Notes
+- **Notion-style editor** (BlockNote): headings, lists, tables, images, code, toggles and
+  **multi-column layouts** (type `/col`, or drag a block to another block's side).
+- **Page options** (`⋯` next to the title): *Full width*, *Small text*, *Copy link*.
+- **Folders as subjects**, with a page tree in the sidebar.
+- **Heading outline**: a rail of dashes on the right edge; hover it for a clickable,
+  indented table of contents.
+- **Tabs**: open several pages at once. `+` opens a new tab; Ctrl/Cmd+click or middle-click any
+  link opens it in a background tab.
+- **Breadcrumbs** with hover menus to jump between sections, folders and pages.
+- **Search** (`Ctrl/Cmd + K`) across titles *and* the text inside your notes.
+
+### Learning
+- **AI quizzes** (Gemini) from any selection of pages, at three difficulties. Every wrong answer
+  links back to the page it came from.
+- **Spaced repetition**: each quiz updates a per-page *mastery* score and schedules the next
+  review (strong recall stretches the interval, weak recall brings it back tomorrow).
+  Due pages show on Home and on the folder page with a one-click **Review** quiz.
+
+### Planning
+- **Planner** with natural-language dates ("review notes tomorrow", "stretch everyday"),
+  priorities, repeating tasks and an optional **subject** per task.
+- **Folder page sidebar**: a **To-do** list for that subject and a **Roadmap**, a checklist of
+  every topic to cover, with a progress bar.
+- **Pomodoro** timer that keeps running across the app (mini timer in the top bar, countdown in
+  the browser tab).
+
+### Motivation (gamification)
+- **Daily goal ring**: pick 10–90 min or set a custom goal (up to 12 hours). Focus sessions
+  *and* time spent writing notes both count.
+- **Streaks** with **streak freezes** (one earned per week, max 2) that protect a missed day.
+- **XP and levels**, **17 achievements**, and celebration popups for unlocks and level-ups.
+- **Progress page**: level, stats, 12-week activity heatmap and every achievement.
+- **Weekly leaderboards** in shared folders (opt out in Settings).
+
+| Action | XP |
+| --- | --- |
+| Each minute of focus or note-writing | 1 |
+| Completing a quiz | 10, +5 per correct answer, +20 for a perfect score |
+| Hitting your daily goal | 20 |
+| Completing a task | 5 (first 10 per day) |
+| Covering a roadmap topic | 10 (first 10 per day) |
+
+A day counts toward your streak after a focus session, a quiz, or 5 minutes of writing notes.
+
+### Collaboration
+Folders can be shared with other Cram users as **Viewer** (read and quiz), **Editor** (edit
+pages) or **Admin** (also manage members). Quizzes, streaks, XP, to-dos and roadmaps are always
+personal.
 
 ## Tech stack
 
-- **Next.js 16** (App Router, Server Actions) + TypeScript + Tailwind CSS v4
-- **shadcn/ui** (Base UI primitives)
-- **Prisma 7** ORM → **Supabase Postgres**
-- **Supabase Auth** (email/password) for accounts, **Supabase Storage** for page images
-- **Gemini 2.5 Flash** (Google AI Studio, free tier) for quiz generation
-- **BlockNote** for the Notion-style page editor
+- **Next.js 16** (App Router, Server Actions, Turbopack) + TypeScript
+- **Tailwind CSS v4** + **shadcn/ui** on **Base UI** primitives
+- **Prisma 7** → **Supabase Postgres**
+- **Supabase Auth** (email/password) and **Supabase Storage** (note images)
+- **BlockNote** editor + `@blocknote/xl-multi-column`
+- **Google Gemini** for quiz generation
 
-## One-time setup
+## Getting started
 
-### 1. Create a Supabase project
+### 1. Supabase
+1. Create a project at [supabase.com](https://supabase.com) (the free tier is fine).
+2. **Project Settings → API**: copy the Project URL, the `anon` key and the `service_role` key.
+3. **Project Settings → Database → Connection string**: copy the **Transaction pooler** string
+   (port 6543) for `DATABASE_URL`, and the **Session pooler / direct** string (port 5432) for
+   `DIRECT_URL`.
+4. **Authentication → URL Configuration**: add `http://localhost:3000/auth/callback` (and your
+   production URL later) to the redirect URLs.
+5. **Storage**: create a **public** bucket named `page-uploads`.
 
-1. Go to [supabase.com](https://supabase.com) → New project (free tier is fine).
-2. **Project Settings → API**: copy the **Project URL**, **anon public** key, and
-   **service_role** key.
-3. **Project Settings → Database → Connection string**:
-   - Copy the **Transaction pooler** string (port 6543) → this is `DATABASE_URL`.
-   - Copy the **Session pooler** or **Direct connection** string (port 5432) → this is
-     `DIRECT_URL`.
-4. **Authentication → Providers**: Email should already be enabled. Under
-   **Authentication → URL Configuration**, add `http://localhost:3000/auth/callback` (and your
-   production URL later) to the Redirect URLs.
-5. **Storage**: create a new bucket named exactly `page-uploads` and mark it **Public** (this is
-   where note images get uploaded to).
+### 2. Gemini
+Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 
-### 2. Get a free Gemini API key
-
-Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey), create a key. Free tier
-is generous enough for personal use.
-
-### 3. Fill in `.env`
-
-Copy `.env.example` → `.env` and fill in the six values from steps 1–2:
-
+### 3. Environment
 ```bash
 cp .env.example .env
 ```
+Fill in the six values. `.env` is git-ignored; never commit it.
 
-### 4. Push the database schema
-
+### 4. Install and migrate
 ```bash
 npm install
-npx prisma migrate dev --name init
+npx prisma migrate deploy
+npx prisma generate
 ```
 
-### 5. Run it
-
+### 5. Run
 ```bash
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email, and you're in.
 
-Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email (check your
-inbox — Supabase sends the confirmation link), and you're in.
+## Scripts
 
-## How sharing works
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build (includes type-checking) |
+| `npm run start` | Serve the production build |
+| `npm run lint` | ESLint |
+| `npx prisma migrate dev --name <change>` | Create a new migration after editing `prisma/schema.prisma` |
+| `npx prisma migrate deploy` | Apply pending migrations (safe: never resets data) |
 
-Every folder has an **Owner** (whoever created it). The owner or an **Admin** can share it with
-anyone who already has a Cram account, at one of three levels:
+## Project structure
 
-- **Viewer** — can read pages and take quizzes, can't edit
-- **Editor** — can also add/edit/delete pages
-- **Admin** — can also invite/remove people and change their role
-
-Quizzes, quiz history, and streaks are always personal — sharing a folder never shares someone
-else's quiz results.
+```
+prisma/
+  schema.prisma          Data model
+  migrations/            SQL migrations
+src/
+  app/
+    page.tsx             Public landing page
+    login/ signup/       Auth pages
+    app/                 The signed-in app (layout = sidebar, tabs, breadcrumb, timer)
+      page.tsx           Home dashboard
+      folders/[folderId]/            Folder: pages, to-do, roadmap, leaderboard
+      folders/[folderId]/pages/[pageId]/  Page editor
+      planner/ pomodoro/ quizzes/ quiz/ progress/ settings/
+    actions/             Server actions (pages, tasks, quiz, roadmap, gamification, search, …)
+  components/            UI (editor, sidebar, tabs, command palette, gamification widgets, …)
+  lib/
+    gamification.ts      Streaks, freezes, XP crediting, achievements, spaced repetition
+    achievements.ts      Achievement definitions
+    levels.ts            XP → level curve
+    data/                Server-side queries
+```
 
 ## Deploying
 
-- **App**: push this repo to GitHub, import it on [Vercel](https://vercel.com/new), add the same
-  environment variables from `.env` in the Vercel project settings.
-- **Database/Auth/Storage**: already hosted on Supabase — no extra deploy step, just make sure
-  your production URL is added to Supabase's Auth redirect URLs.
+- **App**: import the repo on [Vercel](https://vercel.com/new) and add the same environment
+  variables as in `.env`.
+- **Database**: run `npx prisma migrate deploy` against production before (or as part of) each
+  deploy that includes new migrations.
+- Add your production URL to Supabase's Auth redirect URLs.
+
+## License
+
+Cram uses `@blocknote/xl-multi-column`, which is licensed under **GPL-3.0** (or a commercial
+BlockNote license). Distributing Cram therefore requires making its source available under
+GPL-3.0-compatible terms, or buying a BlockNote license.

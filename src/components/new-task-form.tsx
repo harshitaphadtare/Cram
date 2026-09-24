@@ -27,11 +27,14 @@ export function NewTaskForm({
   defaultDueDate,
   defaultFolderId = null,
   compact = false,
+  lockSubject = false,
 }: {
   defaultDueDate?: Date;
   defaultFolderId?: string | null;
-  /** Dashboard variant: title + subject only, no date/priority controls. */
+  /** Box variant: title + subject only, no date/priority controls. */
   compact?: boolean;
+  /** Subject is fixed to `defaultFolderId` (e.g. inside that folder) — hides the picker. */
+  lockSubject?: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [folderId, setFolderId] = useState<string | null>(defaultFolderId);
@@ -76,13 +79,15 @@ export function NewTaskForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder={compact ? "Add a to-do…" : "Add a task… try “review notes tomorrow” or “stretch everyday”"}
-          className={compact ? "basis-full" : "flex-1"}
+          className={compact && !lockSubject ? "basis-full" : "flex-1"}
         />
-        <SubjectSelect
-          value={folderId}
-          onChange={setFolderId}
-          className={compact ? "min-w-0 flex-1" : "hidden w-44 sm:flex"}
-        />
+        {!lockSubject && (
+          <SubjectSelect
+            value={folderId}
+            onChange={setFolderId}
+            className={compact ? "min-w-0 flex-1" : "hidden w-44 sm:flex"}
+          />
+        )}
         {!compact && (
           <>
             <Popover>

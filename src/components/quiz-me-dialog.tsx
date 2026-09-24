@@ -119,7 +119,7 @@ export function QuizMeDialog({ folderId, pages }: { folderId: string; pages: Pag
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button size="sm" disabled={disabled} className="gap-1.5">
+          <Button size="sm" variant="outline" disabled={disabled} className="gap-1.5">
             <Sparkles className="size-4" />
             Quiz me
           </Button>

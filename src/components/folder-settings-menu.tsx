@@ -79,12 +79,12 @@ export function FolderSettingsMenu({
           }
         />
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setRenameOpen(true)}>
+          <DropdownMenuItem onClick={() => setRenameOpen(true)}>
             <Pencil />
             Rename
           </DropdownMenuItem>
           {isOwner && (
-            <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
+            <DropdownMenuItem variant="destructive" onClick={() => setDeleteOpen(true)}>
               <Trash2 />
               Delete folder
             </DropdownMenuItem>

@@ -8,7 +8,6 @@ import {
   FileText,
   Flame,
   Folder,
-  ListTodo,
   PartyPopper,
   Plus,
   Snowflake,
@@ -23,8 +22,6 @@ import { getDashboardData } from "@/lib/data/dashboard";
 import { folderDotClass } from "@/lib/folder-colors";
 import { NewFolderDialog } from "@/components/new-folder-dialog";
 import { TaskItem } from "@/components/task-item";
-import { NewTaskForm } from "@/components/new-task-form";
-import { RoadmapBox } from "@/components/roadmap-box";
 import { Button } from "@/components/ui/button";
 import { GoalRing } from "@/components/gamification/goal-ring";
 import { LevelProgress } from "@/components/gamification/level-progress";
@@ -33,6 +30,7 @@ import { AchievementBadge } from "@/components/gamification/achievement-badge";
 import { ReviewButton } from "@/components/gamification/review-button";
 import { cn } from "@/lib/utils";
 import { todayDateOnly } from "@/lib/date-only";
+import { formatGoal } from "@/lib/goals";
 
 function greetingFor(hour: number) {
   if (hour < 5) return "Working late";
@@ -90,10 +88,8 @@ export default async function DashboardPage() {
   const tomorrow = new Date(today);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const todaysTasks = tasks
-    .filter((t) => !t.completed && !t.folderId && t.dueDate && t.dueDate < tomorrow)
+    .filter((t) => !t.completed && t.dueDate && t.dueDate < tomorrow)
     .slice(0, 6);
-  // Subject-tagged tasks live in the To-do box; tasks due today without a subject stay in "Due today".
-  const subjectTasks = tasks.filter((t) => !t.completed && t.folderId);
 
   const now = new Date();
   const hour = Number(
@@ -149,7 +145,7 @@ export default async function DashboardPage() {
     const left = user.dailyGoalMin - todayMinutes;
     nextStep = {
       icon: <Timer className="size-5" />,
-      title: `${left} ${left === 1 ? "minute" : "minutes"} to your daily goal`,
+      title: `${formatGoal(left)} to your daily goal`,
       body: "A single focus session will get you there. Notes you write count too.",
       action: (
         <Button nativeButton={false} render={<Link href="/app/pomodoro"><Timer />Start focusing</Link>} />
@@ -190,7 +186,7 @@ export default async function DashboardPage() {
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs text-muted-foreground">Today&apos;s goal</span>
                 <span className="font-medium">
-                  {goalMet ? "Goal complete" : `${user.dailyGoalMin - todayMinutes} min to go`}
+                  {goalMet ? "Goal complete" : `${formatGoal(user.dailyGoalMin - todayMinutes)} to go`}
                 </span>
                 <Link href="/app/settings" className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
                   Change goal
@@ -326,41 +322,43 @@ export default async function DashboardPage() {
         </div>
 
         <aside className="flex flex-col gap-6">
-          <section className="flex flex-col overflow-hidden rounded-xl border bg-card">
-            <header className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
-              <h2 className="flex items-center gap-2 text-sm font-medium">
-                <ListTodo className="size-4 text-muted-foreground" />
-                To-do
-                {subjectTasks.length > 0 && (
-                  <span className="text-xs font-normal text-muted-foreground tabular-nums">{subjectTasks.length}</span>
-                )}
-              </h2>
-              <Link href="/app/planner" className="text-xs text-muted-foreground hover:text-foreground">
-                Planner
-              </Link>
-            </header>
-            <div className="border-b px-3 py-2.5">
-              <NewTaskForm compact />
+          <section className="flex flex-col gap-3">
+            <SectionHeader
+              icon={Trophy}
+              title={`Achievements · ${data.unlockedCount}/${data.totalAchievements}`}
+              action={
+                <Button variant="ghost" size="sm" className="text-muted-foreground" nativeButton={false} render={<Link href="/app/progress">View all</Link>} />
+              }
+            />
+            <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+              {data.recentAchievements.length > 0 && (
+                <div className="flex items-center gap-2">
+                  {data.recentAchievements.map((a) => (
+                    <span key={a.key} title={`${a.title} — ${a.description}`}>
+                      <AchievementBadge icon={a.icon} unlocked size="sm" />
+                    </span>
+                  ))}
+                  <span className="ml-1 text-xs text-muted-foreground">Recently unlocked</span>
+                </div>
+              )}
+              {data.nextAchievements.map(({ def, current, target, ratio }) => (
+                <div key={def.key} className="flex items-center gap-3">
+                  <AchievementBadge icon={def.icon} unlocked={false} size="sm" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm">{def.title}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                        {current}/{target}
+                      </span>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded-full bg-muted-foreground/15">
+                      <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max(3, ratio * 100)}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            {subjectTasks.length === 0 ? (
-              <p className="px-4 py-5 text-sm text-muted-foreground">
-                Tasks you tag with a subject show up here.
-              </p>
-            ) : (
-              <div className="flex max-h-80 flex-col gap-px overflow-y-auto p-1.5">
-                {subjectTasks.slice(0, 10).map((task) => (
-                  <TaskItem key={task.id} task={task} plain />
-                ))}
-                {subjectTasks.length > 10 && (
-                  <Link href="/app/planner" className="px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
-                    +{subjectTasks.length - 10} more in the planner
-                  </Link>
-                )}
-              </div>
-            )}
           </section>
-
-          <RoadmapBox items={data.roadmap} initialFolderId={data.roadmapFolderId} />
 
           <section className="flex flex-col gap-3">
             <SectionHeader
@@ -404,44 +402,6 @@ export default async function DashboardPage() {
                 })}
               </div>
             )}
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <SectionHeader
-              icon={Trophy}
-              title={`Achievements · ${data.unlockedCount}/${data.totalAchievements}`}
-              action={
-                <Button variant="ghost" size="sm" className="text-muted-foreground" nativeButton={false} render={<Link href="/app/progress">View all</Link>} />
-              }
-            />
-            <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-              {data.recentAchievements.length > 0 && (
-                <div className="flex items-center gap-2">
-                  {data.recentAchievements.map((a) => (
-                    <span key={a.key} title={`${a.title} — ${a.description}`}>
-                      <AchievementBadge icon={a.icon} unlocked size="sm" />
-                    </span>
-                  ))}
-                  <span className="ml-1 text-xs text-muted-foreground">Recently unlocked</span>
-                </div>
-              )}
-              {data.nextAchievements.map(({ def, current, target, ratio }) => (
-                <div key={def.key} className="flex items-center gap-3">
-                  <AchievementBadge icon={def.icon} unlocked={false} size="sm" />
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm">{def.title}</span>
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                        {current}/{target}
-                      </span>
-                    </div>
-                    <div className="h-1 overflow-hidden rounded-full bg-muted-foreground/15">
-                      <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max(3, ratio * 100)}%` }} />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </section>
         </aside>
       </div>

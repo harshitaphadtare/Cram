@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { formatGoal } from "@/lib/goals";
 
 /** Apple-Activity-style ring: fills as today's study minutes approach the daily goal. */
 export function GoalRing({
@@ -37,7 +38,7 @@ export function GoalRing({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
         <span className="text-xl font-semibold tabular-nums">{minutes}</span>
-        <span className="mt-1 text-[11px] text-muted-foreground">of {goal} min</span>
+        <span className="mt-1 text-[11px] text-muted-foreground">of {formatGoal(goal)}</span>
       </div>
     </div>
   );

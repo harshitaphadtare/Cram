@@ -16,7 +16,7 @@ export async function getDashboardData(user: User, folderIds: string[]) {
   await checkAchievements(user.id);
   const weekStart = addDays(today, -6);
 
-  const [recentPages, focus, quizzes, logs, dueReviews, allReviews, unlocked, stats, roadmap] =
+  const [recentPages, focus, quizzes, logs, dueReviews, allReviews, unlocked, stats] =
     await Promise.all([
       prisma.page.findMany({
         where: { folderId: { in: folderIds } },
@@ -63,11 +63,6 @@ export async function getDashboardData(user: User, folderIds: string[]) {
         orderBy: { unlockedAt: "desc" },
       }),
       getAchievementStats(user.id),
-      prisma.roadmapItem.findMany({
-        where: { userId: user.id, folderId: { in: folderIds } },
-        select: { id: true, folderId: true, title: true, done: true, createdAt: true },
-        orderBy: { order: "asc" },
-      }),
     ]);
 
   const scored = quizzes.filter((q) => q.totalQuestions > 0);
@@ -141,9 +136,5 @@ export async function getDashboardData(user: User, folderIds: string[]) {
     totalAchievements: ACHIEVEMENTS.length,
     recentAchievements,
     nextAchievements,
-    roadmap: roadmap.map((r) => ({ id: r.id, folderId: r.folderId, title: r.title, done: r.done })),
-    // Open the roadmap on the subject you most recently added topics to.
-    roadmapFolderId:
-      [...roadmap].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]?.folderId ?? null,
   };
 }

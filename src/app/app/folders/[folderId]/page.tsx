@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
-import { FileText, Medal } from "lucide-react";
+import { FileText, ListTodo, Medal } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getFolderForUser, getFolderLeaderboard, getFolderMastery } from "@/lib/data/pages";
 import { folderDotClass } from "@/lib/folder-colors";
@@ -16,6 +16,8 @@ import { ShareFolderDialog } from "@/components/share-folder-dialog";
 import { FolderSettingsMenu } from "@/components/folder-settings-menu";
 import { ReviewButton } from "@/components/gamification/review-button";
 import { RoadmapBox } from "@/components/roadmap-box";
+import { NewTaskForm } from "@/components/new-task-form";
+import { TaskItem } from "@/components/task-item";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +57,7 @@ export default async function FolderPage({
   const canManageMembers = roleAtLeast(role, FolderRole.ADMIN);
   const isShared = folder.members.length > 0;
 
-  const [mastery, leaderboard, roadmap] = await Promise.all([
+  const [mastery, leaderboard, roadmap, todos] = await Promise.all([
     getFolderMastery(folder.id, user.id),
     isShared
       ? getFolderLeaderboard([folder.owner, ...folder.members.map((m) => m.user)], user.id)
@@ -64,6 +66,10 @@ export default async function FolderPage({
       where: { userId: user.id, folderId: folder.id },
       select: { id: true, folderId: true, title: true, done: true },
       orderBy: { order: "asc" },
+    }),
+    prisma.task.findMany({
+      where: { userId: user.id, folderId: folder.id, completed: false },
+      orderBy: [{ dueDate: "asc" }, { order: "asc" }],
     }),
   ]);
 
@@ -120,7 +126,8 @@ export default async function FolderPage({
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      {/* items-start: the page list shouldn't stretch to the height of the sidebar boxes. */}
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         {folder.pages.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-16 text-center text-muted-foreground">
             <FileText className="size-8" />
@@ -161,6 +168,33 @@ export default async function FolderPage({
         )}
 
         <aside className="flex flex-col gap-6">
+          <section className="flex flex-col overflow-hidden rounded-xl border bg-card">
+            <header className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
+              <h2 className="flex items-center gap-2 text-sm font-medium">
+                <ListTodo className="size-4 text-muted-foreground" />
+                To-do
+                {todos.length > 0 && (
+                  <span className="text-xs font-normal tabular-nums text-muted-foreground">{todos.length}</span>
+                )}
+              </h2>
+              <Link href="/app/planner" className="text-xs text-muted-foreground hover:text-foreground">
+                Planner
+              </Link>
+            </header>
+            <div className="border-b px-3 py-2.5">
+              <NewTaskForm compact lockSubject defaultFolderId={folder.id} />
+            </div>
+            {todos.length === 0 ? (
+              <p className="px-4 py-4 text-sm text-muted-foreground">Nothing to do for {folder.name} yet.</p>
+            ) : (
+              <div className="flex max-h-80 flex-col gap-px overflow-y-auto p-1.5">
+                {todos.map((task) => (
+                  <TaskItem key={task.id} task={task} plain hideSubject />
+                ))}
+              </div>
+            )}
+          </section>
+
           <RoadmapBox items={roadmap} initialFolderId={folder.id} locked />
           {leaderboard.length > 1 && (
             <div className="flex flex-col gap-3">

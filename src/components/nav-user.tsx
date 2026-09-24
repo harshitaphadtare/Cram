@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { signOut } from "@/app/actions/auth";
+import { logOut } from "@/lib/log-out";
 
 function initials(name: string | null, email: string) {
   const source = name?.trim() || email;
@@ -66,9 +66,7 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              onSelect={() => {
-                void signOut();
-              }}
+              onClick={logOut}
             >
               <LogOut />
               Log out

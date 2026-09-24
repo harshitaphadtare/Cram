@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Camera, Loader2, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,7 +18,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfileName, updateTimezone, updateAvatarUrl } from "@/app/actions/profile";
-import { signOut } from "@/app/actions/auth";
+import { logOut } from "@/lib/log-out";
 
 const TIMEZONES: string[] =
   typeof Intl.supportedValuesOf === "function"
@@ -36,7 +35,6 @@ export function SettingsForm({
 }: {
   user: { name: string | null; email: string; avatarUrl: string | null; timezone: string };
 }) {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState(user.name ?? "");
@@ -259,10 +257,7 @@ export function SettingsForm({
       <Button
         variant="outline"
         className="w-fit gap-1.5 text-destructive hover:text-destructive"
-        onClick={() => {
-          void signOut();
-          router.refresh();
-        }}
+        onClick={logOut}
       >
         <LogOut className="size-4" />
         Log out

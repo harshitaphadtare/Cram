@@ -29,12 +29,6 @@ export default async function LandingPage() {
             <CramLogo />
           </Link>
           <div className="flex items-center gap-1.5">
-            <a
-              href="#how-it-works"
-              className="hidden rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground sm:block"
-            >
-              How it works
-            </a>
             <ThemeToggle />
             <Button variant="ghost" nativeButton={false} render={<Link href="/login">Log in</Link>} />
             <Button nativeButton={false} render={<Link href="/signup">Get started</Link>} />

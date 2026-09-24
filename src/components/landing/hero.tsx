@@ -54,7 +54,8 @@ export function Hero() {
         }}
       />
 
-      <div className="mx-auto flex max-w-4xl flex-col items-center px-4 pt-28 pb-24 text-center sm:px-6 sm:pt-36 sm:pb-32">
+      {/* Fill exactly one screen under the 3.5rem nav, so the next section starts below the fold. */}
+      <div className="mx-auto flex min-h-[calc(100svh-3.5rem)] max-w-4xl flex-col items-center justify-center px-4 py-20 text-center sm:px-6">
         <h1 className="text-5xl leading-[1.04] font-semibold sm:text-7xl">
           <RevealLine text="Study a little every day." delay={0.05} />
           <RevealLine text="Remember it for good." delay={0.3} muted />

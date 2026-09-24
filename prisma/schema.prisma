@@ -1,0 +1,304 @@
+// Prisma schema for Cram — the AI study buddy app.
+// Database: Postgres (Supabase). Auth is handled by Supabase Auth;
+// the User model here mirrors auth.users (same id) plus app-specific profile/streak data.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum FolderRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum TaskPriority {
+  P1
+  P2
+  P3
+  P4
+}
+
+enum PomodoroType {
+  WORK
+  SHORT_BREAK
+  LONG_BREAK
+}
+
+// ---------- Core ----------
+
+model User {
+  id             String    @id // matches Supabase auth.users.id
+  email          String    @unique
+  name           String?
+  avatarUrl      String?
+  streakCount    Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastActiveDate DateTime? @db.Date
+  timezone       String    @default("UTC")
+
+  // ---- Gamification ----
+  xp                Int       @default(0)
+  dailyGoalMin      Int       @default(20)
+  streakFreezes     Int       @default(1)
+  lastFreezeGrantAt DateTime?
+  /// Last moment we credited note-editing time; edits within a few minutes of this count as study time.
+  lastEditAt        DateTime?
+  showOnLeaderboard Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  ownedFolders  Folder[]          @relation("FolderOwner")
+  folderMembers FolderMember[]
+  quizzes       Quiz[]
+  tasks         Task[]
+  pomodoros     PomodoroSession[]
+  streakLogs    StreakLog[]
+  sentInvites   FolderMember[]    @relation("InvitedBy")
+  achievements  UserAchievement[]
+  pageReviews   PageReview[]
+  roadmapItems  RoadmapItem[]
+
+  @@map("users")
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("teal")
+  icon      String?
+  ownerId   String
+  owner     User     @relation("FolderOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members FolderMember[]
+  pages   Page[]
+  quizzes Quiz[]
+  tasks   Task[]
+  roadmap RoadmapItem[]
+
+  @@index([ownerId])
+  @@map("folders")
+}
+
+model FolderMember {
+  id          String     @id @default(cuid())
+  folderId    String
+  folder      Folder     @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        FolderRole
+  invitedById String?
+  invitedBy   User?      @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+
+  @@unique([folderId, userId])
+  @@index([userId])
+  @@map("folder_members")
+}
+
+model Page {
+  id          String   @id @default(cuid())
+  folderId    String
+  folder      Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  title       String   @default("Untitled")
+  content     Json     @default("[]") // BlockNote block JSON
+  order       Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  /// Notion-style page layout options.
+  fullWidth Boolean @default(false)
+  smallText Boolean @default(false)
+
+  quizPages     QuizPage[]
+  quizQuestions QuizQuestion[]
+  reviews       PageReview[]
+
+  @@index([folderId])
+  @@map("pages")
+}
+
+model Quiz {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId       String
+  folder         Folder     @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  title          String
+  difficulty     Difficulty
+  totalQuestions Int
+  correctCount   Int        @default(0)
+  status         String     @default("in_progress") // in_progress | completed
+  createdAt      DateTime   @default(now())
+  completedAt    DateTime?
+
+  pages     QuizPage[]
+  questions QuizQuestion[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@map("quizzes")
+}
+
+// Join table: which pages a quiz was generated from
+model QuizPage {
+  id     String @id @default(cuid())
+  quizId String
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  pageId String
+  page   Page   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, pageId])
+  @@map("quiz_pages")
+}
+
+model QuizQuestion {
+  id            String   @id @default(cuid())
+  quizId        String
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  order         Int
+  questionText  String
+  options       Json // string[]
+  correctAnswer String
+  userAnswer    String?
+  isCorrect     Boolean?
+  explanation   String?
+  sourcePageId  String?
+  sourcePage    Page?    @relation(fields: [sourcePageId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+
+  @@index([quizId])
+  @@index([sourcePageId])
+  @@map("quiz_questions")
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueDate     DateTime?    @db.Date
+  recurring   Boolean      @default(false)
+  priority    TaskPriority @default(P4)
+  completed   Boolean      @default(false)
+  completedAt DateTime?
+  order       Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  /// Optional subject (folder) the task belongs to — tagged tasks show in the dashboard to-do box.
+  folderId String?
+  folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
+  pomodoros PomodoroSession[]
+
+  @@index([userId])
+  @@index([userId, dueDate])
+  @@map("tasks")
+}
+
+model PomodoroSession {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        PomodoroType
+  durationMin Int
+  completed   Boolean      @default(false)
+  taskId      String?
+  task        Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  startedAt   DateTime     @default(now())
+  completedAt DateTime?
+
+  @@index([userId])
+  @@index([userId, startedAt])
+  @@map("pomodoro_sessions")
+}
+
+/// One row per calendar day (user's timezone) with any study activity — doubles as the daily
+/// activity log for the goal ring, XP history and weekly leaderboards.
+model StreakLog {
+  id      String   @id @default(cuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date    DateTime @db.Date
+  /// True once the day counts toward the streak (a focus session, a quiz, or 5+ min of notes).
+  studied Boolean  @default(true)
+  /// Day was covered by a streak freeze rather than studied.
+  frozen  Boolean  @default(false)
+  /// Study time credited that day (focus sessions + active note editing).
+  seconds Int      @default(0)
+  xp      Int      @default(0)
+  goalMet Boolean  @default(false)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("streak_logs")
+}
+
+/// Unlocked achievements. Definitions (titles, icons, criteria) live in src/lib/achievements.ts.
+model UserAchievement {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key        String
+  unlockedAt DateTime @default(now())
+  /// False until the user has been shown the unlock celebration.
+  seen       Boolean  @default(false)
+
+  @@unique([userId, key])
+  @@map("user_achievements")
+}
+
+/// Spaced-repetition state per (user, page), updated from quiz results.
+model PageReview {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pageId         String
+  page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  /// 0–100 estimate of how well the user knows this page.
+  mastery        Int      @default(0)
+  intervalDays   Float    @default(1)
+  dueAt          DateTime
+  lastReviewedAt DateTime @default(now())
+
+  @@unique([userId, pageId])
+  @@index([userId, dueAt])
+  @@map("page_reviews")
+}
+
+/// A topic on a student's roadmap for a subject (folder) — their personal syllabus checklist.
+model RoadmapItem {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId    String
+  folder      Folder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  title       String
+  done        Boolean   @default(false)
+  completedAt DateTime?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, folderId])
+  @@map("roadmap_items")
+}

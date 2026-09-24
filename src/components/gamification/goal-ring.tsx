@@ -15,12 +15,15 @@ export function GoalRing({
   size = 96,
   stroke = 9,
   className,
+  showLabel = true,
 }: {
   minutes: number;
   goal: number;
   size?: number;
   stroke?: number;
   className?: string;
+  /** Off for tiny icon-style rings that sit next to their own text. */
+  showLabel?: boolean;
 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -48,14 +51,16 @@ export function GoalRing({
         />
       </svg>
       {/* Label scales with the ring so it stays centred and proportional at any size. */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="leading-none font-semibold tabular-nums" style={{ fontSize: Math.round(size * 0.19) }}>
-          {compactMinutes(minutes)}
-        </span>
-        <span className="mt-[0.35em] leading-none text-muted-foreground" style={{ fontSize: Math.max(9, Math.round(size * 0.105)) }}>
-          of {compactMinutes(goal)}
-        </span>
-      </div>
+      {showLabel && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <span className="leading-none font-semibold tabular-nums" style={{ fontSize: Math.round(size * 0.19) }}>
+            {compactMinutes(minutes)}
+          </span>
+          <span className="mt-[0.35em] leading-none text-muted-foreground" style={{ fontSize: Math.max(9, Math.round(size * 0.105)) }}>
+            of {compactMinutes(goal)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

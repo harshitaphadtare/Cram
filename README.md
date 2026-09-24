@@ -2,6 +2,8 @@
 
 **Study a little every day. Remember it for good.**
 
+Live at **[cram-eta.vercel.app](https://cram-eta.vercel.app)**.
+
 Cram is a study workspace for students: Notion-style notes organised by subject, AI quizzes
 generated from your own notes, spaced review that tells you what you're about to forget, a
 focus timer, and a gamified streak/XP system designed to bring you back every day.
@@ -32,8 +34,10 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
   priorities, repeating tasks and an optional **subject** per task.
 - **Folder page sidebar**: a **To-do** list for that subject and a **Roadmap**, a checklist of
   every topic to cover, with a progress bar.
-- **Pomodoro** timer that keeps running across the app (mini timer in the top bar, countdown in
-  the browser tab).
+- **Pomodoro** focus page that always fits the window: large numerals, segmented progress for
+  the session cycle, and shortcuts (**Space** start/pause, **R** reset, **S** skip). The timer
+  keeps running across the app (mini timer in the top bar, countdown in the browser tab), and you
+  can link a task to the session.
 
 ### Motivation (gamification)
 - **Daily goal ring**: pick 10–90 min or set a custom goal (up to 12 hours). Focus sessions
@@ -53,12 +57,16 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
 
 A day counts toward your streak after a focus session, a quiz, or 5 minutes of writing notes.
 
-### Accounts
-- Email/password sign-up with a **strong-password policy**: at least 10 characters with upper-
-  and lowercase letters, a number and a symbol, shown as a live checklist and strength meter.
+### Accounts & onboarding
+- **Continue with Google**, or email/password sign-up with a **strong-password policy**: at
+  least 10 characters with upper- and lowercase letters, a number and a symbol, shown as a live
+  checklist and strength meter. (Microsoft sign-in is also supported; its button appears once the
+  Azure provider is enabled in Supabase.)
 - **Forgot password**: `/forgot-password` emails a reset link, which leads to
   `/reset-password` to choose a new password. The link must be opened in the same browser that
   requested it.
+- **Product tour** for new accounts: a spotlight walks through the app, opening each page it
+  describes (Skip / Back / Next). Replay it from the profile menu → **Take the tour**.
 
 ### Collaboration
 Folders can be shared with other Cram users as **Viewer** (read and quiz), **Editor** (edit
@@ -68,9 +76,9 @@ personal.
 ## Tech stack
 
 - **Next.js 16** (App Router, Server Actions, Turbopack) + TypeScript
-- **Tailwind CSS v4** + **shadcn/ui** on **Base UI** primitives
+- **Tailwind CSS v4** + **shadcn/ui** on **Base UI** primitives, **Motion** for animation
 - **Prisma 7** → **Supabase Postgres**
-- **Supabase Auth** (email/password) and **Supabase Storage** (note images)
+- **Supabase Auth** (email/password + Google) and **Supabase Storage** (note images, max 4 MB)
 - **BlockNote** editor + `@blocknote/xl-multi-column`
 - **Google Gemini** for quiz generation
 
@@ -113,7 +121,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email
 
 ## Guides
 
-- [Google & Microsoft sign-in setup](docs/AUTH-PROVIDERS.md)
+- [Google (and optional Microsoft) sign-in setup](docs/AUTH-PROVIDERS.md)
 - [Manual test checklist](docs/TESTING.md)
 - [Deploying to Vercel + Supabase](docs/DEPLOYMENT.md)
 
@@ -134,31 +142,42 @@ Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email
 prisma/
   schema.prisma          Data model
   migrations/            SQL migrations
+docs/                    Setup, testing and deployment guides
+vercel.json              Pins server functions to Sydney (next to the database)
 src/
+  proxy.ts               Session refresh + route protection
   app/
     page.tsx             Public landing page
-    login/ signup/       Auth pages
-    app/                 The signed-in app (layout = sidebar, tabs, breadcrumb, timer)
+    login/ signup/       Auth pages (Google + email)
+    forgot-password/ reset-password/
+    auth/callback/       Handles email-confirmation, reset and OAuth redirects
+    app/                 The signed-in app (layout = sidebar, tabs, breadcrumb, timer, tour)
       page.tsx           Home dashboard
       folders/[folderId]/            Folder: pages, to-do, roadmap, leaderboard
       folders/[folderId]/pages/[pageId]/  Page editor
       planner/ pomodoro/ quizzes/ quiz/ progress/ settings/
     actions/             Server actions (pages, tasks, quiz, roadmap, gamification, search, …)
-  components/            UI (editor, sidebar, tabs, command palette, gamification widgets, …)
+  components/            UI (editor, sidebar, tabs, command palette, product tour, landing,
+                         gamification widgets, …)
   lib/
     gamification.ts      Streaks, freezes, XP crediting, achievements, spaced repetition
     achievements.ts      Achievement definitions
     levels.ts            XP → level curve
     data/                Server-side queries
+    auth.ts              Current user (local JWT check, cached per request)
 ```
 
 ## Deploying
 
-- **App**: import the repo on [Vercel](https://vercel.com/new) and add the same environment
-  variables as in `.env`.
-- **Database**: run `npx prisma migrate deploy` against production before (or as part of) each
-  deploy that includes new migrations.
-- Add your production URL to Supabase's Auth redirect URLs.
+Full steps in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). In short:
+
+- **App**: import the repo on [Vercel](https://vercel.com/new) and add the six environment
+  variables from `.env`. Every push to `main` redeploys.
+- **Region**: `vercel.json` runs the server in `syd1` because the Supabase database is in
+  `ap-southeast-2` (Sydney). If your database is elsewhere, change it to the nearest Vercel
+  region — a mismatch adds ~200 ms to every query.
+- **Database**: run `npm run db:deploy` before deploying code that adds migrations.
+- **Supabase**: set the Site URL and redirect URLs to your production domain.
 
 ## License
 

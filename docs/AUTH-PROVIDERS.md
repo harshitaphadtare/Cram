@@ -1,8 +1,12 @@
-# Setting up Google and Microsoft sign-in
+# Setting up Google (and optional Microsoft) sign-in
+
+**Status:** Google sign-in is live. Microsoft is supported in the code but not enabled — its
+button stays hidden until the Azure provider is switched on in Supabase.
 
 The login and sign-up pages show **Continue with Google** / **Continue with Microsoft** buttons
 automatically once a provider is enabled in Supabase (the app checks every 5 minutes). Until then
-the buttons stay hidden, so nothing looks broken.
+the buttons stay hidden, so nothing looks broken. Provider keys live **only in Supabase** — no
+`.env` or Vercel variables are needed.
 
 You'll need your Supabase **callback URL**. Find it in Supabase → **Authentication → Providers →
 Google** (or Azure). It looks like:
@@ -25,8 +29,8 @@ https://<your-project-ref>.supabase.co/auth/v1/callback
      **Publish app** when you're ready for everyone (basic scopes don't need Google review).
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID**
    - Application type: **Web application**, name: `Cram web`.
-   - **Authorised JavaScript origins**: `http://localhost:3000` and later your production URL
-     (e.g. `https://cram.vercel.app`).
+   - **Authorised JavaScript origins**: `http://localhost:3000` and your production URL
+     (`https://cram-eta.vercel.app`).
    - **Authorised redirect URIs**: your Supabase callback URL (from above).
    - Create, then copy the **Client ID** and **Client secret**.
 
@@ -36,7 +40,7 @@ secret → Save.
 
 ---
 
-## Microsoft (≈10 minutes)
+## Microsoft (optional, ≈10 minutes)
 
 Lets students sign in with personal Microsoft accounts and most university Microsoft 365 accounts.
 

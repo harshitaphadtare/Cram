@@ -13,7 +13,7 @@ sections so you see what a new student sees. Tick each box as you go.
 - [ ] **Log in** with a wrong password shows a friendly error.
 - [ ] **Forgot password** → email arrives → link opens "Set a new password" → new password works;
       the old one doesn't. *(Open the link in the same browser.)*
-- [ ] **Continue with Google / Microsoft** (once set up) creates an account with your name and photo.
+- [ ] **Continue with Google** creates an account with your name and photo (Microsoft too, if enabled).
 - [ ] Logging in with Google using the same email as an existing email account keeps the same data.
 - [ ] **Log out** from the profile menu and from Settings both return to `/login`.
 
@@ -55,7 +55,8 @@ sections so you see what a new student sees. Tick each box as you go.
 
 ## 7. Pomodoro
 - [ ] The page fits the window without scrolling (try a small laptop screen too).
-- [ ] Start / Pause / Resume / Reset; **Space** and **R** shortcuts.
+- [ ] Start / Pause / Resume / Reset / Skip; **Space**, **R** and **S** shortcuts.
+- [ ] Link a task from the task picker; the session counts toward that task.
 - [ ] Navigate away while running → mini timer in the top bar; countdown in the browser tab title.
 - [ ] Let a short session finish (set Focus to 1 min in settings) → "+XP" toast, sessions count up.
 
@@ -70,3 +71,5 @@ sections so you see what a new student sees. Tick each box as you go.
 - [ ] Every page in **light and dark** mode.
 - [ ] Phone width (≈375 px): landing, login, dashboard, a page, Pomodoro.
 - [ ] No red errors in the browser console on the main pages.
+- [ ] Clicking between Home, a folder, a page and Planner shows a skeleton instantly and loads in
+      well under a second on the live site.

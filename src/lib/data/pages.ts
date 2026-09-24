@@ -4,19 +4,24 @@ import { getFolderRole, roleAtLeast } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
 
 export async function getFolderForUser(folderId: string, userId: string) {
-  const [folder, role] = await Promise.all([
-    prisma.folder.findUnique({
-      where: { id: folderId },
-      include: {
-        pages: { orderBy: { order: "asc" } },
-        members: { include: { user: true }, orderBy: { createdAt: "asc" } },
-        owner: true,
+  // One query: pages without their (potentially large) content, plus members/owner, from which
+  // the viewer's role is derived instead of re-querying permissions.
+  const folder = await prisma.folder.findUnique({
+    where: { id: folderId },
+    include: {
+      pages: {
+        select: { id: true, title: true, order: true, updatedAt: true, createdAt: true },
+        orderBy: { order: "asc" },
       },
-    }),
-    getFolderRole(folderId, userId),
-  ]);
+      members: { include: { user: true }, orderBy: { createdAt: "asc" } },
+      owner: true,
+    },
+  });
+  if (!folder) return null;
 
-  if (!folder || !roleAtLeast(role, FolderRole.VIEWER)) return null;
+  const role =
+    folder.ownerId === userId ? FolderRole.OWNER : (folder.members.find((m) => m.userId === userId)?.role ?? null);
+  if (!roleAtLeast(role, FolderRole.VIEWER)) return null;
   return { folder, role: role! };
 }
 

@@ -12,11 +12,13 @@ export type DayStatus = "studied" | "frozen" | "partial" | "none" | "today";
 /** Everything the home dashboard shows beyond folders and tasks, fetched in parallel. */
 export async function getDashboardData(user: User, folderIds: string[]) {
   const today = userToday(user.timezone);
-  // Catches anything earned outside a crediting action (e.g. history from before achievements existed).
-  await checkAchievements(user.id);
   const weekStart = addDays(today, -6);
+  // Stats are computed once and shared: the achievement check below (which catches anything earned
+  // outside a crediting action) and the "next achievements" list both need them.
+  const stats = await getAchievementStats(user.id);
+  await checkAchievements(user.id, stats);
 
-  const [recentPages, focus, quizzes, logs, dueReviews, allReviews, unlocked, stats] =
+  const [recentPages, focus, quizzes, logs, dueReviews, allReviews, unlocked] =
     await Promise.all([
       prisma.page.findMany({
         where: { folderId: { in: folderIds } },
@@ -62,7 +64,6 @@ export async function getDashboardData(user: User, folderIds: string[]) {
         where: { userId: user.id, NOT: { key: { startsWith: "level:" } } },
         orderBy: { unlockedAt: "desc" },
       }),
-      getAchievementStats(user.id),
     ]);
 
   const scored = quizzes.filter((q) => q.totalQuestions > 0);

@@ -25,9 +25,10 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Verifies the session JWT locally against the cached signing keys (no round trip to Supabase
+  // Auth on every request); still refreshes an expired session via the cookies above.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? data.claims : null;
 
   // "/" is the public landing page (exact match only — everything under /app stays protected).
   const isPublicPath =

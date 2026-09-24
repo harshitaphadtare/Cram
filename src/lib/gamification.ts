@@ -241,9 +241,9 @@ export async function getAchievementStats(userId: string): Promise<AchievementSt
 }
 
 /** Unlocks any achievements whose criteria are now met. Safe to call often. */
-export async function checkAchievements(userId: string): Promise<void> {
+export async function checkAchievements(userId: string, precomputed?: AchievementStats): Promise<void> {
   const [stats, unlocked] = await Promise.all([
-    getAchievementStats(userId),
+    precomputed ?? getAchievementStats(userId),
     prisma.userAchievement.findMany({ where: { userId }, select: { key: true } }),
   ]);
   const have = new Set(unlocked.map((a) => a.key));

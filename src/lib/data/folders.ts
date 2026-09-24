@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { FolderRole } from "@/generated/prisma/enums";
 
@@ -12,8 +13,11 @@ export interface VisibleFolder {
   role: FolderRole;
 }
 
-/** Folders the user can see: ones they own, plus ones shared with them. */
-export async function listVisibleFolders(userId: string): Promise<VisibleFolder[]> {
+/**
+ * Folders the user can see: ones they own, plus ones shared with them. Cached per request, since
+ * both the app layout (sidebar) and pages like the dashboard need it.
+ */
+export const listVisibleFolders = cache(async (userId: string): Promise<VisibleFolder[]> => {
   const folders = await prisma.folder.findMany({
     where: {
       OR: [{ ownerId: userId }, { members: { some: { userId } } }],
@@ -34,4 +38,4 @@ export async function listVisibleFolders(userId: string): Promise<VisibleFolder[
     pages: f.pages,
     role: f.ownerId === userId ? FolderRole.OWNER : f.members[0]!.role,
   }));
-}
+});

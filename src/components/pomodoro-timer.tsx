@@ -81,11 +81,21 @@ function TimerSettings() {
   );
 }
 
+/** One labelled cell of the today block. */
+function Cell({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5 px-5 py-3.5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="flex min-h-7 items-center gap-2 text-sm">{children}</div>
+    </div>
+  );
+}
+
 /**
- * Today's context as one slim centred row under the controls: goal, cycle, and the task in focus.
- * Wraps onto two lines on narrow screens.
+ * Today's context in one block under the controls: goal, session cycle and the task in focus,
+ * as three equal labelled cells. Stacks vertically on narrow screens.
  */
-function TodayRow({
+function TodayBlock({
   tasks,
   todayMinutes,
   goalMinutes,
@@ -100,25 +110,23 @@ function TodayRow({
   const left = Math.max(0, goalMinutes - todayMinutes);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-      <span className="flex items-center gap-2">
-        <GoalRing minutes={todayMinutes} goal={goalMinutes} size={18} stroke={3} showLabel={false} />
-        {left === 0 ? (
-          <span className="text-foreground">Daily goal complete</span>
-        ) : (
-          <span>
-            <span className="text-foreground">{formatGoal(left)}</span> to go today
-          </span>
-        )}
-      </span>
+    <section className="grid w-[min(42rem,100%)] divide-y overflow-hidden rounded-xl border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <Cell label="Today's goal">
+        <GoalRing minutes={todayMinutes} goal={goalMinutes} size={20} stroke={3} showLabel={false} />
+        <span className="truncate">
+          {left === 0 ? (
+            "Complete"
+          ) : (
+            <>
+              <span className="font-medium">{formatGoal(left)}</span>
+              <span className="text-muted-foreground"> to go</span>
+            </>
+          )}
+        </span>
+      </Cell>
 
-      <span className="h-4 w-px bg-border" aria-hidden />
-
-      <span
-        className="flex items-center gap-2"
-        aria-label={`${cyclePosition} of ${settings.longBreakInterval} sessions done`}
-      >
-        <span className="flex gap-1">
+      <Cell label="Long break">
+        <span className="flex gap-1" aria-label={`${cyclePosition} of ${settings.longBreakInterval} sessions done`}>
           {Array.from({ length: settings.longBreakInterval }, (_, i) => (
             <span
               key={i}
@@ -129,33 +137,36 @@ function TodayRow({
             />
           ))}
         </span>
-        Long break in {untilLongBreak}
-      </span>
-
-      <span className="h-4 w-px bg-border" aria-hidden />
-
-      {tasks.length === 0 ? (
-        <span>
-          No open tasks.{" "}
-          <Link href="/app/planner" className="text-foreground underline-offset-4 hover:underline">
-            Add one
-          </Link>
+        <span className="truncate">
+          <span className="font-medium">In {untilLongBreak}</span>
+          <span className="text-muted-foreground"> {untilLongBreak === 1 ? "session" : "sessions"}</span>
         </span>
-      ) : (
-        <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
-          <SelectTrigger size="sm" className="max-w-60 border-transparent bg-transparent px-2 shadow-none hover:bg-accent">
-            <SelectValue placeholder="Choose a task" />
-          </SelectTrigger>
-          <SelectContent>
-            {tasks.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    </div>
+      </Cell>
+
+      <Cell label="Working on">
+        {tasks.length === 0 ? (
+          <Link href="/app/planner" className="truncate font-medium underline-offset-4 hover:underline">
+            Add a task
+          </Link>
+        ) : (
+          <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
+            <SelectTrigger
+              size="sm"
+              className="-ml-2 w-[calc(100%+0.5rem)] border-transparent bg-transparent px-2 font-medium shadow-none hover:bg-accent"
+            >
+              <SelectValue placeholder="Choose a task" />
+            </SelectTrigger>
+            <SelectContent>
+              {tasks.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Cell>
+    </section>
   );
 }
 
@@ -219,7 +230,7 @@ export function PomodoroTimer({
         ))}
       </div>
 
-      <div data-tour="pomodoro-timer" className="relative aspect-square min-h-0" style={{ width: "min(21rem, 46svh, 84vw)" }}>
+      <div data-tour="pomodoro-timer" className="relative aspect-square min-h-0" style={{ width: "min(17.5rem, 40svh, 78vw)" }}>
         <div
           aria-hidden
           className={cn(
@@ -275,7 +286,7 @@ export function PomodoroTimer({
         <TimerSettings />
       </div>
 
-      <TodayRow tasks={tasks} todayMinutes={todayMinutes} goalMinutes={goalMinutes} />
+      <TodayBlock tasks={tasks} todayMinutes={todayMinutes} goalMinutes={goalMinutes} />
     </div>
   );
 }

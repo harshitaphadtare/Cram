@@ -175,7 +175,7 @@ export function PageEditor({
         smallText && "cram-small-text",
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div data-tour="editor" className="flex items-center justify-between gap-3">
         <input
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
@@ -227,7 +227,7 @@ export function PageEditor({
         </DropdownMenu>
       </div>
 
-      <div data-tour="editor" className="min-h-40">
+      <div className="min-h-40">
         <BlockNoteContext.Provider value={{ colorSchemePreference: colorScheme }}>
           <BlockNoteView
             editor={editor}

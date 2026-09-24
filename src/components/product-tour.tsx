@@ -79,8 +79,8 @@ function buildSteps({ firstName, folderHref, pageHref }: TourContext): TourStep[
     steps.push({
       route: pageHref,
       target: "editor",
-      title: "Write like in Notion",
-      body: "Type / for headings, lists, tables and columns. The ⋯ menu next to the title switches the page to full width.",
+      title: "Write your notes",
+      body: "Click anywhere below the title and type / to add headings, lists, tables or columns. The ⋯ menu switches the page to full width.",
     });
   }
 
@@ -218,7 +218,9 @@ export function ProductTour({
     const el = findTarget(step.target);
     if (!el) return setRect(null);
     const r = el.getBoundingClientRect();
-    setRect({ top: r.top - PAD, left: r.left - PAD, width: r.width + PAD * 2, height: r.height + PAD * 2 });
+    const top = Math.max(r.top - PAD, 8);
+    const bottom = Math.min(r.bottom + PAD, window.innerHeight - 8);
+    setRect({ top, left: r.left - PAD, width: r.width + PAD * 2, height: Math.max(bottom - top, 0) });
   }, [step.target]);
 
   // Once on the right page, wait for the target to render, scroll it into view, then reveal.
@@ -232,7 +234,14 @@ export function ProductTour({
       if (cancelled) return;
       const el = findTarget(step.target);
       if (!step.target || el || Date.now() - startedAt > TARGET_TIMEOUT_MS) {
-        el?.scrollIntoView({ block: "center", behavior: "smooth" });
+        if (el) {
+          const r = el.getBoundingClientRect();
+          const fullyVisible = r.top >= 80 && r.bottom <= window.innerHeight - 16;
+          // Only scroll when needed; tall targets align to the top rather than the middle.
+          if (!fullyVisible) {
+            el.scrollIntoView({ block: r.height > window.innerHeight * 0.6 ? "start" : "center", behavior: "smooth" });
+          }
+        }
         // Let the page's entrance animation and the scroll settle before measuring.
         timer = setTimeout(() => {
           if (cancelled) return;

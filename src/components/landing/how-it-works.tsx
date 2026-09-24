@@ -37,7 +37,7 @@ function PanelFrame({ children }: { children: React.ReactNode }) {
   return <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-xl shadow-black/5">{children}</div>;
 }
 
-function WriteVisual() {
+export function WriteVisual() {
   const text = "A load balancer spreads incoming requests across servers, so no single machine becomes the bottleneck.";
   const reduce = useReducedMotion();
   return (
@@ -73,7 +73,7 @@ function WriteVisual() {
   );
 }
 
-function QuizVisual() {
+export function QuizVisual() {
   const options = ["Encrypts traffic between services", "Distributes requests across servers", "Caches database queries"];
   return (
     <PanelFrame>
@@ -116,7 +116,7 @@ function QuizVisual() {
   );
 }
 
-function ReviewVisual() {
+export function ReviewVisual() {
   const rows: [string, number, boolean][] = [
     ["Consistent hashing", 38, true],
     ["CAP theorem", 54, true],
@@ -155,7 +155,7 @@ function ReviewVisual() {
   );
 }
 
-function StreakVisual() {
+export function StreakVisual() {
   const days = ["M", "T", "W", "T", "F", "S", "S"];
   return (
     <PanelFrame>

@@ -69,7 +69,7 @@ export function StudyPreferences({
   const customSelected = !isPreset(goal);
 
   return (
-    <Card>
+    <Card data-tour="study-goals">
       <CardHeader>
         <CardTitle className="text-base">Study goals</CardTitle>
         <CardDescription>

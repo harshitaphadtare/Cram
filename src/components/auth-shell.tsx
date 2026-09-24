@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { CramLogo } from "@/components/cram-logo";
+import { AuthArtPanel } from "@/components/auth-art-panel";
 
 /**
- * Minimal, centered auth layout: brand in the top bar, one focused column for the form, and a
- * quiet footer. No marketing chrome — the task here is just to get the student signed in.
+ * Split auth layout: a focused form column on the left, and on large screens a rounded panel
+ * with the landing page's 3D study objects and a rotating tagline, so the brand feels continuous
+ * from the homepage into the app.
  */
 export function AuthShell({
   title,
@@ -16,38 +18,38 @@ export function AuthShell({
   subtitle?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  /** e.g. "New to Cram? Sign up" in the top-right corner. */
+  /** e.g. "New to Cram? Sign up" in the top-right corner of the form column. */
   topRight?: React.ReactNode;
 }) {
   return (
-    <div className="relative flex min-h-screen flex-col bg-background">
-      {/* A barely-there glow behind the form; purely decorative. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,var(--primary)_0%,transparent_65%)] opacity-[0.07]"
-      />
+    <div className="grid min-h-screen bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      <div className="flex min-h-screen flex-col px-6 sm:px-10">
+        <header className="flex h-20 items-center justify-between">
+          <Link href="/" className="rounded-md transition-opacity hover:opacity-80">
+            <CramLogo />
+          </Link>
+          {topRight && <div className="text-sm text-muted-foreground">{topRight}</div>}
+        </header>
 
-      <header className="relative flex h-16 items-center justify-between px-6">
-        <Link href="/" className="rounded-md transition-opacity hover:opacity-80">
-          <CramLogo />
-        </Link>
-        {topRight && <div className="text-sm text-muted-foreground">{topRight}</div>}
-      </header>
-
-      <main className="relative flex flex-1 items-center justify-center px-6 pb-16">
-        <div className="flex w-full max-w-[380px] flex-col gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <h1 className="text-2xl font-semibold">{title}</h1>
-            {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+        <main className="flex flex-1 items-center justify-center pb-16">
+          <div className="flex w-full max-w-[400px] flex-col gap-8 animate-in fade-in slide-in-from-bottom-3 duration-700 ease-out">
+            <div className="flex flex-col gap-2">
+              <h1 className="text-3xl font-semibold">{title}</h1>
+              {subtitle && <p className="text-muted-foreground">{subtitle}</p>}
+            </div>
+            {children}
+            {footer && <div className="text-sm text-muted-foreground">{footer}</div>}
           </div>
-          {children}
-          {footer && <div className="text-center text-sm text-muted-foreground">{footer}</div>}
-        </div>
-      </main>
+        </main>
 
-      <footer className="relative px-6 pb-6 text-center text-xs text-muted-foreground">
-        © {new Date().getFullYear()} Cram
-      </footer>
+        <footer className="pb-6 text-xs text-muted-foreground">© {new Date().getFullYear()} Cram</footer>
+      </div>
+
+      <div className="hidden p-3 lg:block">
+        <div className="sticky top-3 h-[calc(100vh-1.5rem)]">
+          <AuthArtPanel />
+        </div>
+      </div>
     </div>
   );
 }

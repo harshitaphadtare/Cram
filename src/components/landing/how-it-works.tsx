@@ -38,12 +38,12 @@ function PanelFrame({ children }: { children: React.ReactNode }) {
 }
 
 function WriteVisual() {
-  const text = "Photosynthesis turns light energy into chemical energy stored in glucose.";
+  const text = "A load balancer spreads incoming requests across servers, so no single machine becomes the bottleneck.";
   const reduce = useReducedMotion();
   return (
     <PanelFrame>
-      <p className="text-xs text-muted-foreground">Biology / Plant cells</p>
-      <p className="mt-3 text-2xl font-bold">Photosynthesis</p>
+      <p className="text-xs text-muted-foreground">System Design / Scalability</p>
+      <p className="mt-3 text-2xl font-bold">Load balancing</p>
       <p className="mt-4 text-lg font-semibold">Key idea</p>
       <p className="mt-1 text-[15px] leading-relaxed">
         {text.split("").map((ch, i) => (
@@ -59,7 +59,7 @@ function WriteVisual() {
         <span className="ml-0.5 inline-block h-4 w-px translate-y-0.5 animate-pulse bg-foreground" />
       </p>
       <div className="mt-5 grid grid-cols-2 gap-3">
-        {["Light reactions", "Calvin cycle"].map((t) => (
+        {["Round robin", "Least connections"].map((t) => (
           <div key={t} className="rounded-lg border p-3">
             <p className="text-sm font-medium">{t}</p>
             <div className="mt-2 flex flex-col gap-1.5">
@@ -74,14 +74,14 @@ function WriteVisual() {
 }
 
 function QuizVisual() {
-  const options = ["Chemical to light energy", "Light to chemical energy", "Heat to light energy"];
+  const options = ["Encrypts traffic between services", "Distributes requests across servers", "Caches database queries"];
   return (
     <PanelFrame>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>Question 3 of 8</span>
         <span>Medium</span>
       </div>
-      <p className="mt-3 font-medium">What does photosynthesis convert?</p>
+      <p className="mt-3 font-medium">What is the main job of a load balancer?</p>
       <div className="mt-4 flex flex-col gap-2">
         {options.map((o, i) => (
           <motion.div
@@ -110,7 +110,7 @@ function QuizVisual() {
         transition={{ delay: 1.2 }}
         className="mt-4 text-xs text-muted-foreground"
       >
-        Correct. Linked to <span className="text-foreground">Photosynthesis › Key idea</span>
+        Correct. Linked to <span className="text-foreground">Load balancing › Key idea</span>
       </motion.p>
     </PanelFrame>
   );
@@ -118,15 +118,15 @@ function QuizVisual() {
 
 function ReviewVisual() {
   const rows: [string, number, boolean][] = [
-    ["Calvin cycle", 38, true],
-    ["Light reactions", 54, true],
-    ["Cell membranes", 72, false],
-    ["Mitochondria", 91, false],
+    ["Consistent hashing", 38, true],
+    ["CAP theorem", 54, true],
+    ["Caching strategies", 72, false],
+    ["Load balancing", 91, false],
   ];
   return (
     <PanelFrame>
       <div className="flex items-center justify-between">
-        <p className="font-medium">Biology mastery</p>
+        <p className="font-medium">System Design mastery</p>
         <span className="rounded-full bg-streak/15 px-2 py-0.5 text-xs text-streak">2 due today</span>
       </div>
       <div className="mt-4 flex flex-col gap-3.5">
@@ -149,7 +149,7 @@ function ReviewVisual() {
         ))}
       </div>
       <div className="mt-5 rounded-lg bg-primary/[0.06] px-3 py-2.5 text-sm">
-        Review <span className="font-medium">Calvin cycle</span> today, before it fades.
+        Review <span className="font-medium">Consistent hashing</span> today, before it fades.
       </div>
     </PanelFrame>
   );

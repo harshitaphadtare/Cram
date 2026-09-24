@@ -1,65 +1,133 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { Sparkles, X } from "lucide-react";
+import { Loader2, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { completeOnboarding } from "@/app/actions/onboarding";
 import { cn } from "@/lib/utils";
 
 interface TourStep {
+  /** Page the step lives on; the tour navigates there before showing it. */
+  route: string;
   /** `data-tour` value of the element to spotlight; omit for a centred card. */
   target?: string;
   title: string;
   body: string;
 }
 
-const buildSteps = (firstName: string | null): TourStep[] => [
-  {
-    title: firstName ? `Welcome to Cram, ${firstName}!` : "Welcome to Cram!",
-    body: "Here's a one-minute tour of how Cram helps you study a little every day and actually remember it.",
-  },
-  {
-    target: "folders",
-    title: "One folder per subject",
-    body: "Create a folder for each subject. Inside, write pages of notes, keep a to-do list and a roadmap of every topic to cover.",
-  },
-  {
-    target: "search",
-    title: "Find anything, fast",
-    body: "Press Ctrl+K from anywhere to jump to a page or search inside all of your notes.",
-  },
-  {
-    target: "goal",
-    title: "Your daily goal",
-    body: "Focus sessions and time spent writing notes fill this ring. Study a few minutes each day to grow your streak. Freezes cover the busy days.",
-  },
-  {
-    target: "next-step",
-    title: "Always know what to do next",
-    body: "Cram suggests the most useful thing to do right now, like reviewing pages you're about to forget.",
-  },
-  {
-    target: "pomodoro",
-    title: "Focus in short bursts",
-    body: "Start a 25-minute focus session. The timer keeps running in the top bar while you work in your notes.",
-  },
-  {
-    target: "level",
-    title: "Level up as you learn",
-    body: "Every minute of study earns XP. Level up, unlock achievements, and see your history on the Progress page.",
-  },
-  {
-    title: "You're all set",
-    body: "Start by creating a folder for the subject you're studying right now. You can replay this tour any time from your profile menu.",
-  },
-];
+interface TourContext {
+  firstName: string | null;
+  /** First folder, and a page inside one, so folder/editor steps can open real content. */
+  folderHref: string | null;
+  pageHref: string | null;
+}
+
+function buildSteps({ firstName, folderHref, pageHref }: TourContext): TourStep[] {
+  const steps: TourStep[] = [
+    {
+      route: "/app",
+      title: firstName ? `Welcome to Cram, ${firstName}!` : "Welcome to Cram!",
+      body: "A quick tour of the app. Each step opens the page it's about, so you'll see exactly where everything lives.",
+    },
+    {
+      route: "/app",
+      target: "goal",
+      title: "Your daily goal",
+      body: "Focus sessions and time spent writing notes fill this ring. Study a little every day to grow your streak. Freezes cover the busy days.",
+    },
+    {
+      route: "/app",
+      target: "next-step",
+      title: "Always know what's next",
+      body: "Home suggests the single most useful thing to do right now, like reviewing pages you're about to forget.",
+    },
+    {
+      route: "/app",
+      target: "folders",
+      title: "One folder per subject",
+      body: "Every subject gets a folder in the sidebar. Use the + to create one; hover a folder to see its pages.",
+    },
+  ];
+
+  if (folderHref) {
+    steps.push(
+      {
+        route: folderHref,
+        target: "folder-pages",
+        title: "Your notes for this subject",
+        body: "All the pages in a folder, with how well you know each one once you've quizzed yourself.",
+      },
+      {
+        route: folderHref,
+        target: "quiz-me",
+        title: "Quiz yourself with AI",
+        body: "Pick some pages and Cram writes a quiz from your own notes. Wrong answers link back to where you wrote it.",
+      },
+      {
+        route: folderHref,
+        target: "folder-sidebar",
+        title: "To-do and roadmap",
+        body: "Keep tasks for this subject here, and list every topic you need to cover so you can tick them off.",
+      },
+    );
+  }
+
+  if (pageHref) {
+    steps.push({
+      route: pageHref,
+      target: "editor",
+      title: "Write like in Notion",
+      body: "Type / for headings, lists, tables and columns. The ⋯ menu next to the title switches the page to full width.",
+    });
+  }
+
+  steps.push(
+    {
+      route: pageHref ?? folderHref ?? "/app",
+      target: "search",
+      title: "Find anything, fast",
+      body: "Press Ctrl+K anywhere to jump to a page or search inside all of your notes.",
+    },
+    {
+      route: "/app/planner",
+      target: "planner-input",
+      title: "Plan your days",
+      body: "Add tasks in plain English, like “revise chapter 4 tomorrow”, and tag them with a subject.",
+    },
+    {
+      route: "/app/pomodoro",
+      target: "pomodoro-timer",
+      title: "Focus in short bursts",
+      body: "Start a 25-minute focus session. The timer keeps running in the top bar while you work in your notes.",
+    },
+    {
+      route: "/app/progress",
+      target: "progress-level",
+      title: "Watch it add up",
+      body: "Every minute of study earns XP. Level up, unlock achievements and see your study history here.",
+    },
+    {
+      route: "/app/settings",
+      target: "study-goals",
+      title: "Make it yours",
+      body: "Set a daily goal that fits your schedule, from 10 minutes to several hours.",
+    },
+    {
+      route: "/app",
+      title: "You're all set",
+      body: "Start by creating a folder for the subject you're studying right now. You can replay this tour from your profile menu.",
+    },
+  );
+  return steps;
+}
 
 const PAD = 8;
 const CARD_W = 340;
 const GAP = 14;
+const TARGET_TIMEOUT_MS = 4000;
 
 type Rect = { top: number; left: number; width: number; height: number };
 
@@ -96,93 +164,132 @@ function placeCard(rect: Rect, cardH: number) {
 export const START_TOUR_EVENT = "cram:start-tour";
 
 /**
- * First-run product tour: a spotlight that glides between parts of the app with a small card
- * explaining each one (Skip / Back / Next). Shown once per account on the dashboard; replayable
- * via the START_TOUR_EVENT (profile menu → "Take the tour").
+ * First-run product tour. Each step belongs to a page: the tour navigates there, waits for the
+ * element to render, then glides a spotlight onto it with a small explainer card (Skip / Back /
+ * Next). Shown once per account; replayable via START_TOUR_EVENT (profile menu → "Take the tour").
  */
-export function ProductTour({ show, firstName }: { show: boolean; firstName: string | null }) {
+export function ProductTour({
+  show,
+  firstName,
+  folderHref,
+  pageHref,
+}: { show: boolean } & TourContext) {
   const pathname = usePathname();
   const router = useRouter();
-  const steps = buildSteps(firstName);
+  const steps = useMemo(() => buildSteps({ firstName, folderHref, pageHref }), [firstName, folderHref, pageHref]);
   const [open, setOpen] = useState(false);
-  const [pendingStart, setPendingStart] = useState(show);
   const [index, setIndex] = useState(0);
+  // False while navigating to a step's page and waiting for its target to appear.
+  const [ready, setReady] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardPos, setCardPos] = useState<{ top: number; left: number } | null>(null);
-  const step = steps[index];
+  const step = steps[Math.min(index, steps.length - 1)];
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
     () => false,
   );
 
+  // First visit: start once the app has settled.
+  useEffect(() => {
+    if (!show) return;
+    const t = setTimeout(() => setOpen(true), 700);
+    return () => clearTimeout(t);
+  }, [show]);
+
   // Replays requested from the profile menu.
   useEffect(() => {
-    const start = () => setPendingStart(true);
+    const start = () => {
+      setIndex(0);
+      setReady(false);
+      setOpen(true);
+    };
     window.addEventListener(START_TOUR_EVENT, start);
     return () => window.removeEventListener(START_TOUR_EVENT, start);
   }, []);
 
-  // The tour points at dashboard widgets, so it only starts on the dashboard.
+  // Go to the step's page if we aren't there yet.
   useEffect(() => {
-    if (!pendingStart) return;
-    if (pathname !== "/app") {
-      router.push("/app");
-      return;
-    }
-    // Give the page's entrance animation a moment to settle before measuring.
-    const t = setTimeout(() => {
-      setIndex(0);
-      setOpen(true);
-      setPendingStart(false);
-    }, 600);
-    return () => clearTimeout(t);
-  }, [pendingStart, pathname, router]);
+    if (open && pathname !== step.route) router.push(step.route);
+  }, [open, pathname, step.route, router]);
 
   const measure = useCallback(() => {
-    const el = findTarget(step?.target);
-    if (!el) {
-      setRect(null);
-      return;
-    }
+    const el = findTarget(step.target);
+    if (!el) return setRect(null);
     const r = el.getBoundingClientRect();
     setRect({ top: r.top - PAD, left: r.left - PAD, width: r.width + PAD * 2, height: r.height + PAD * 2 });
-  }, [step?.target]);
+  }, [step.target]);
 
-  // Bring the target into view, then follow it through scrolls and resizes.
+  // Once on the right page, wait for the target to render, scroll it into view, then reveal.
   useEffect(() => {
-    if (!open) return;
-    const el = findTarget(step?.target);
-    el?.scrollIntoView({ block: "center", behavior: "smooth" });
-    const t = setTimeout(measure, el ? 350 : 0);
+    if (!open || pathname !== step.route) return;
+    let cancelled = false;
+    const startedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+
+    const poll = () => {
+      if (cancelled) return;
+      const el = findTarget(step.target);
+      if (!step.target || el || Date.now() - startedAt > TARGET_TIMEOUT_MS) {
+        el?.scrollIntoView({ block: "center", behavior: "smooth" });
+        // Let the page's entrance animation and the scroll settle before measuring.
+        timer = setTimeout(() => {
+          if (cancelled) return;
+          measure();
+          setReady(true);
+        }, el ? 450 : 150);
+        return;
+      }
+      timer = setTimeout(poll, 100);
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [open, pathname, step.route, step.target, measure]);
+
+  // Follow the target through scrolls and resizes.
+  useEffect(() => {
+    if (!open || !ready) return;
     window.addEventListener("resize", measure);
     document.addEventListener("scroll", measure, { capture: true, passive: true });
     return () => {
-      clearTimeout(t);
       window.removeEventListener("resize", measure);
       document.removeEventListener("scroll", measure, { capture: true });
     };
-  }, [open, step?.target, measure]);
+  }, [open, ready, measure]);
 
   useLayoutEffect(() => {
     if (!open) return;
     const h = cardRef.current?.offsetHeight ?? 200;
     // Positioning depends on the rendered card height, which is only known after layout.
     setCardPos(rect ? placeCard(rect, h) : null);
-  }, [open, rect, index]);
+  }, [open, rect, index, ready]);
 
   const finish = useCallback(() => {
     setOpen(false);
+    setIndex(0);
     void completeOnboarding();
   }, []);
 
+  const goTo = useCallback(
+    (i: number) => {
+      const target = steps[i];
+      // Only hide while switching pages; same-page steps just glide.
+      if (target.route !== steps[index].route) setReady(false);
+      setIndex(i);
+    },
+    [steps, index],
+  );
+
   const next = useCallback(() => {
     if (index === steps.length - 1) finish();
-    else setIndex((i) => i + 1);
-  }, [index, steps.length, finish]);
+    else goTo(index + 1);
+  }, [index, steps.length, finish, goTo]);
 
-  const back = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+  const back = useCallback(() => goTo(Math.max(0, index - 1)), [goTo, index]);
 
   useEffect(() => {
     if (!open) return;
@@ -221,15 +328,21 @@ export function ProductTour({ show, firstName }: { show: boolean; firstName: str
             className="pointer-events-none absolute rounded-xl ring-2 ring-primary/60"
             initial={false}
             animate={
-              rect
-                ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height, opacity: 1 }
-                : { top: window.innerHeight / 2, left: window.innerWidth / 2, width: 0, height: 0, opacity: 1 }
+              rect && ready
+                ? { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
+                : { top: window.innerHeight / 2, left: window.innerWidth / 2, width: 0, height: 0 }
             }
-            transition={{ type: "spring", stiffness: 260, damping: 30 }}
+            transition={{ type: "spring", stiffness: 240, damping: 30 }}
             style={{ boxShadow: "0 0 0 9999px rgb(0 0 0 / 0.55)" }}
           />
           {/* Clicks outside the card don't fall through to the app. */}
           <div className="absolute inset-0" onClick={(e) => e.stopPropagation()} />
+
+          {!ready && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="size-6 animate-spin text-white/80" />
+            </div>
+          )}
 
           <motion.div
             ref={cardRef}
@@ -238,12 +351,15 @@ export function ProductTour({ show, firstName }: { show: boolean; firstName: str
               centred && "top-1/2 left-1/2",
             )}
             initial={false}
-            animate={
-              centred
+            animate={{
+              ...(centred
                 ? { x: "-50%", y: "-50%", top: "50%", left: "50%" }
-                : { x: 0, y: 0, top: cardPos?.top ?? 0, left: cardPos?.left ?? 0 }
-            }
+                : { x: 0, y: 0, top: cardPos?.top ?? 0, left: cardPos?.left ?? 0 }),
+              opacity: ready ? 1 : 0,
+              scale: ready ? 1 : 0.97,
+            }}
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
+            style={{ pointerEvents: ready ? "auto" : "none" }}
           >
             <button
               type="button"
@@ -262,6 +378,9 @@ export function ProductTour({ show, firstName }: { show: boolean; firstName: str
                 exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.18 }}
               >
+                <p className="mb-1.5 text-xs text-muted-foreground">
+                  {index + 1} of {steps.length}
+                </p>
                 {(isFirst || isLast) && (
                   <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <Sparkles className="size-5" />
@@ -275,18 +394,14 @@ export function ProductTour({ show, firstName }: { show: boolean; firstName: str
             </AnimatePresence>
 
             <div className="mt-5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1" aria-label={`Step ${index + 1} of ${steps.length}`}>
-                {steps.map((_, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      "h-1.5 rounded-full transition-all duration-300",
-                      i === index ? "w-4 bg-primary" : "w-1.5 bg-muted-foreground/25",
-                    )}
-                  />
-                ))}
+              <div className="flex h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted-foreground/15">
+                <motion.span
+                  className="h-full rounded-full bg-primary"
+                  animate={{ width: `${((index + 1) / steps.length) * 100}%` }}
+                  transition={{ type: "spring", stiffness: 200, damping: 30 }}
+                />
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5">
                 {isFirst ? (
                   <Button variant="ghost" size="sm" onClick={finish}>
                     Skip

@@ -227,28 +227,30 @@ export function PageEditor({
         </DropdownMenu>
       </div>
 
-      <BlockNoteContext.Provider value={{ colorSchemePreference: colorScheme }}>
-        <BlockNoteView
-          editor={editor}
-          editable={editable}
-          theme={editorTheme}
-          slashMenu={false}
-          onChange={() => {
-            handleChange();
-            scheduleContentSave();
-          }}
-        >
-          <SuggestionMenuController
-            triggerCharacter="/"
-            getItems={async (query) =>
-              filterSuggestionItems(
-                combineByGroup(getDefaultReactSlashMenuItems(editor), getMultiColumnSlashMenuItems(editor)),
-                query,
-              )
-            }
-          />
-        </BlockNoteView>
-      </BlockNoteContext.Provider>
+      <div data-tour="editor" className="min-h-40">
+        <BlockNoteContext.Provider value={{ colorSchemePreference: colorScheme }}>
+          <BlockNoteView
+            editor={editor}
+            editable={editable}
+            theme={editorTheme}
+            slashMenu={false}
+            onChange={() => {
+              handleChange();
+              scheduleContentSave();
+            }}
+          >
+            <SuggestionMenuController
+              triggerCharacter="/"
+              getItems={async (query) =>
+                filterSuggestionItems(
+                  combineByGroup(getDefaultReactSlashMenuItems(editor), getMultiColumnSlashMenuItems(editor)),
+                  query,
+                )
+              }
+            />
+          </BlockNoteView>
+        </BlockNoteContext.Provider>
+      </div>
 
       <PageOutline headings={headings} />
     </div>

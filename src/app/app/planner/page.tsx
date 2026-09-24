@@ -35,7 +35,9 @@ export default async function PlannerPage() {
         <p className="text-muted-foreground">Plan your day, one task at a time.</p>
       </div>
 
-      <NewTaskForm defaultDueDate={new Date()} />
+      <div data-tour="planner-input">
+        <NewTaskForm defaultDueDate={new Date()} />
+      </div>
 
       {sections.length === 0 && completed.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">

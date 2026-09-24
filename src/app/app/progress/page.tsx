@@ -65,7 +65,10 @@ export default async function ProgressPage() {
         <p className="text-muted-foreground">Every minute you put in, adding up.</p>
       </header>
 
-      <section className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:flex-row sm:items-center">
+      <section
+        data-tour="progress-level"
+        className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:flex-row sm:items-center"
+      >
         <div className="flex size-20 shrink-0 flex-col items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <span className="text-[11px] font-medium uppercase">Level</span>
           <span className="text-3xl leading-none font-semibold">{info.level}</span>

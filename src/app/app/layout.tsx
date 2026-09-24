@@ -26,6 +26,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }),
     getTodayWorkSessionCount(),
   ]);
+  // A real page for the tour's editor step, if the user has any.
+  const folderWithPages = folders.find((f) => f.pages.length > 0);
+  const pageHref = folderWithPages
+    ? `/app/folders/${folderWithPages.id}/pages/${folderWithPages.pages[0].id}`
+    : null;
   const breadcrumbFolders = folders.map((f) => ({
     id: f.id,
     name: f.name,
@@ -61,7 +66,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </SidebarInset>
         <Celebrations items={celebrations} />
         <CommandPalette folders={breadcrumbFolders} />
-        <ProductTour show={!user.onboardedAt} firstName={user.name?.split(" ")[0] ?? null} />
+        <ProductTour
+          show={!user.onboardedAt}
+          firstName={user.name?.split(" ")[0] ?? null}
+          folderHref={folders[0] ? `/app/folders/${folders[0].id}` : null}
+          pageHref={pageHref}
+        />
       </SidebarProvider>
       </SubjectsProvider>
     </PomodoroProvider>

@@ -39,7 +39,7 @@ export function CramLogo({
         <span
           className={cn(
             "font-brand leading-none font-bold tracking-[0.16em] text-foreground",
-            size === "lg" ? "text-xl" : size === "sm" ? "text-[13px]" : "text-[15px]",
+            size === "lg" ? "text-xl" : size === "sm" ? "text-[0.8125rem]" : "text-[0.9375rem]",
           )}
         >
           CRAM

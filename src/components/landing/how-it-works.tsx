@@ -45,7 +45,7 @@ export function WriteVisual() {
       <p className="text-xs text-muted-foreground">System Design / Scalability</p>
       <p className="mt-3 text-2xl font-bold">Load balancing</p>
       <p className="mt-4 text-lg font-semibold">Key idea</p>
-      <p className="mt-1 text-[15px] leading-relaxed">
+      <p className="mt-1 text-[0.9375rem] leading-relaxed">
         {text.split("").map((ch, i) => (
           <motion.span
             key={i}

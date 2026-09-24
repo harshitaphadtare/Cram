@@ -21,7 +21,7 @@ function isTyping(target: EventTarget | null) {
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
-  return <kbd className="rounded border px-1 py-px font-sans text-[10px] leading-none text-muted-foreground">{children}</kbd>;
+  return <kbd className="rounded border px-1 py-px font-sans text-[0.625rem] leading-none text-muted-foreground">{children}</kbd>;
 }
 
 function TimerSettings() {
@@ -197,7 +197,7 @@ export function PomodoroTimer({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="mt-1 text-[clamp(4.5rem,19svh,10rem)] leading-none font-extralight tracking-[-0.04em] tabular-nums"
+            className="mt-1 text-[clamp(4rem,15svh,8.5rem)] leading-none font-extralight tracking-[-0.04em] tabular-nums"
           >
             {formatClock(secondsLeft)}
           </motion.p>

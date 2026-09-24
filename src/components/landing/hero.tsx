@@ -66,7 +66,7 @@ export function Hero() {
         <motion.div {...fade(0.85)} className="mt-9 flex flex-wrap items-center justify-center gap-3">
           <Button
             size="lg"
-            className="group h-11 px-5 text-[15px]"
+            className="group h-11 px-5 text-[0.9375rem]"
             nativeButton={false}
             render={
               <Link href="/signup">
@@ -78,7 +78,7 @@ export function Hero() {
           <Button
             size="lg"
             variant="outline"
-            className="h-11 px-5 text-[15px]"
+            className="h-11 px-5 text-[0.9375rem]"
             nativeButton={false}
             render={<a href="#how-it-works">See how it works</a>}
           />

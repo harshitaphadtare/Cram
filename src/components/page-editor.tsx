@@ -178,7 +178,7 @@ export function PageEditor({
     <div
       className={cn(
         "mx-auto flex w-full flex-1 flex-col gap-3 pt-10 pb-32",
-        fullWidth ? "max-w-none md:px-6 xl:pr-16" : "max-w-[720px]",
+        fullWidth ? "max-w-none md:px-6 xl:pr-16" : "max-w-[45rem]",
         smallText && "cram-small-text",
       )}
     >

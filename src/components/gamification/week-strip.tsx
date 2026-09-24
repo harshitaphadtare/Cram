@@ -12,7 +12,7 @@ export function WeekStrip({ days }: { days: { date: Date; status: DayStatus; isT
         <div key={date.toISOString()} className="flex flex-col items-center gap-1">
           <span
             className={cn(
-              "flex size-7 items-center justify-center rounded-full text-[11px]",
+              "flex size-7 items-center justify-center rounded-full text-[0.6875rem]",
               status === "studied" && "bg-streak text-streak-foreground",
               status === "frozen" && "bg-frost/20 text-frost",
               status === "partial" && "border border-dashed border-streak/60",
@@ -34,7 +34,7 @@ export function WeekStrip({ days }: { days: { date: Date; status: DayStatus; isT
             {status === "studied" && <Check className="size-3.5" strokeWidth={3} />}
             {status === "frozen" && <Snowflake className="size-3.5" />}
           </span>
-          <span className={cn("text-[10px]", isToday ? "font-medium text-foreground" : "text-muted-foreground")}>
+          <span className={cn("text-[0.625rem]", isToday ? "font-medium text-foreground" : "text-muted-foreground")}>
             {WEEKDAY.format(date)}
           </span>
         </div>

@@ -32,7 +32,7 @@ export function AuthShell({
         </header>
 
         <main className="flex flex-1 items-center justify-center pb-16">
-          <div className="flex w-full max-w-[400px] flex-col gap-8 animate-in fade-in slide-in-from-bottom-3 duration-700 ease-out">
+          <div className="flex w-full max-w-[25rem] flex-col gap-8 animate-in fade-in slide-in-from-bottom-3 duration-700 ease-out">
             <div className="flex flex-col gap-2">
               <h1 className="text-3xl font-semibold">{title}</h1>
               {subtitle && <p className="text-muted-foreground">{subtitle}</p>}

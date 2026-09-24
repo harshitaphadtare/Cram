@@ -483,7 +483,7 @@ const sidebarMenuButtonVariants = cva(
         outline: "bg-background shadow-[0_0_0_1px_var(--sidebar-border)]",
       },
       size: {
-        default: "h-[30px] text-sm",
+        default: "h-[1.875rem] text-sm",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },

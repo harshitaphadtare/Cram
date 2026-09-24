@@ -202,9 +202,9 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
             }}
             onKeyDown={onKeyDown}
             placeholder="Search pages, folders and notes…"
-            className="h-12 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
+            className="h-12 flex-1 bg-transparent text-[0.9375rem] outline-none placeholder:text-muted-foreground"
           />
-          <kbd className="rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground">Esc</kbd>
+          <kbd className="rounded border px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">Esc</kbd>
         </div>
 
         <div ref={listRef} className="max-h-[min(60vh,420px)] overflow-y-auto p-1.5">
@@ -219,7 +219,7 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
               return (
                 <div key={item.id}>
                   {header && (
-                    <p className="px-2.5 pt-2.5 pb-1 text-[11px] font-medium text-muted-foreground">{header}</p>
+                    <p className="px-2.5 pt-2.5 pb-1 text-[0.6875rem] font-medium text-muted-foreground">{header}</p>
                   )}
                   <button
                     type="button"
@@ -251,7 +251,7 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
           )}
         </div>
 
-        <div className="flex items-center gap-4 border-t px-4 py-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-4 border-t px-4 py-2 text-[0.6875rem] text-muted-foreground">
           <span>↑↓ to navigate</span>
           <span>↵ to open</span>
           <span>Ctrl+↵ in new tab</span>
@@ -268,11 +268,11 @@ export function SearchTrigger() {
       type="button"
       onClick={() => setPaletteOpen(true)}
       data-tour="search"
-      className="flex h-[30px] w-full items-center gap-2 rounded-md px-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+      className="flex h-[1.875rem] w-full items-center gap-2 rounded-md px-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
     >
       <Search className="size-4 shrink-0 text-sidebar-foreground/80" />
       <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">Search</span>
-      <kbd className="rounded border border-sidebar-border px-1 text-[10px] text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
+      <kbd className="rounded border border-sidebar-border px-1 text-[0.625rem] text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
         Ctrl K
       </kbd>
     </button>

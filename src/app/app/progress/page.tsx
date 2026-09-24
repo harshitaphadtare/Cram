@@ -70,7 +70,7 @@ export default async function ProgressPage() {
         className="flex flex-col gap-5 rounded-xl border bg-card p-6 sm:flex-row sm:items-center"
       >
         <div className="flex size-20 shrink-0 flex-col items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          <span className="text-[11px] font-medium uppercase">Level</span>
+          <span className="text-[0.6875rem] font-medium uppercase">Level</span>
           <span className="text-3xl leading-none font-semibold">{info.level}</span>
         </div>
         <div className="flex flex-1 flex-col gap-3">
@@ -161,7 +161,7 @@ export default async function ProgressPage() {
                   <p className={cn("truncate text-sm font-medium", !at && "text-muted-foreground")}>{a.title}</p>
                   <p className="truncate text-xs text-muted-foreground">{a.description}</p>
                   {at ? (
-                    <p className="text-[11px] text-gold">
+                    <p className="text-[0.6875rem] text-gold">
                       Unlocked {at.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </p>
                   ) : (
@@ -169,7 +169,7 @@ export default async function ProgressPage() {
                       <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted-foreground/15">
                         <div className="cram-grow-x h-full rounded-full bg-gold/70" style={{ width: `${(current / target) * 100}%` }} />
                       </div>
-                      <span className="text-[11px] tabular-nums text-muted-foreground">
+                      <span className="text-[0.6875rem] tabular-nums text-muted-foreground">
                         {current}/{target}
                       </span>
                     </div>

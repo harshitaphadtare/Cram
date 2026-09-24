@@ -136,7 +136,7 @@ export function PageOutline({ headings }: { headings: OutlineHeading[] }) {
                   type="button"
                   onClick={() => jumpTo(h.id)}
                   className={cn(
-                    "block w-full truncate rounded-md py-1 pr-2 text-left text-[13px] leading-5 transition-colors hover:bg-accent",
+                    "block w-full truncate rounded-md py-1 pr-2 text-left text-[0.8125rem] leading-5 transition-colors hover:bg-accent",
                     LIST_INDENT[depth(h.level)],
                     h.id === activeId
                       ? "font-medium text-primary"

@@ -143,6 +143,9 @@
   }
   html {
     @apply font-sans;
+    /* 14px base (Notion/Linear density). Nearly every size in the app is rem-based, so this one
+       value scales text, spacing and components together. Percent respects user font settings. */
+    font-size: 87.5%;
   }
   h1,
   h2,
@@ -188,7 +191,8 @@
 }
 .bn-default-styles {
   font-family: var(--font-sans) !important;
-  font-size: 16px;
+  /* ≈15px at the 14px base — a touch larger than UI text, like Notion's editor. */
+  font-size: 1.0625rem;
   line-height: 1.5;
 }
 .bn-editor .bn-block-content {
@@ -235,7 +239,7 @@
 /* Tables: Notion sets them a size down (14px) with roomy cells and hairline borders. BlockNote
  * hardcodes #ddd borders, which glare in dark mode. */
 .bn-editor [data-content-type="table"] {
-  font-size: 14px;
+  font-size: 0.9375rem;
   line-height: 1.5;
 }
 .bn-editor [data-content-type="table"] th,
@@ -250,10 +254,10 @@
 
 /* Page option: small text (Notion's "Small text") — shrinks the body a step; headings follow. */
 .cram-small-text .bn-default-styles {
-  font-size: 14px;
+  font-size: 0.9375rem;
 }
 .cram-small-text .bn-editor [data-content-type="table"] {
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 
 /* Columns: Notion-like gutters, with no stray padding on the outermost columns. */
@@ -330,5 +334,14 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* iOS Safari zooms into any focused field under 16px; keep form text at 16px on phones. */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }

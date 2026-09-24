@@ -70,7 +70,7 @@ export default async function LandingPage() {
             </p>
             <Button
               size="lg"
-              className="group h-11 px-6 text-[15px]"
+              className="group h-11 px-6 text-[0.9375rem]"
               nativeButton={false}
               render={
                 <Link href="/signup">

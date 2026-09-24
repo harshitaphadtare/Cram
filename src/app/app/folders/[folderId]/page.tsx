@@ -216,7 +216,7 @@ export default async function FolderPage({
                     </span>
                     <Avatar className="size-6">
                       {entry.avatarUrl && <AvatarImage src={entry.avatarUrl} alt={entry.name} />}
-                      <AvatarFallback className="text-[10px]">{entry.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      <AvatarFallback className="text-[0.625rem]">{entry.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                     </Avatar>
                     <span className="min-w-0 flex-1 truncate text-sm">
                       {entry.name}

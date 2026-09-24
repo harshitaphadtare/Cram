@@ -357,7 +357,7 @@ export default async function DashboardPage() {
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm">{def.title}</span>
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">
                         {current}/{target}
                       </span>
                     </div>

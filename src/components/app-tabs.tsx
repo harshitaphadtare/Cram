@@ -68,7 +68,7 @@ export function AppTabs({ folders }: { folders: BreadcrumbFolder[] }) {
           <div
             key={tab.id}
             className={cn(
-              "group relative flex h-full w-52 min-w-24 shrink items-center rounded-t-lg text-sm transition-colors",
+              "group relative flex h-full w-52 min-w-24 shrink items-center rounded-t-lg text-sm transition-colors animate-in fade-in slide-in-from-bottom-1 duration-200",
               isActive
                 ? "bg-background text-foreground"
                 : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",

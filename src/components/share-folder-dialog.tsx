@@ -140,7 +140,7 @@ export function ShareFolderDialog({
               <Input
                 id="invite-email"
                 type="email"
-                placeholder="friend@example.com"
+                placeholder="Their Cram account email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />

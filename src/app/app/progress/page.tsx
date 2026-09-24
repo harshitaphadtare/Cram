@@ -59,7 +59,7 @@ export default async function ProgressPage() {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
+    <div className="cram-stagger mx-auto flex w-full max-w-4xl flex-col gap-10">
       <header className="flex flex-col gap-1">
         <h1 className="text-3xl font-semibold">Progress</h1>
         <p className="text-muted-foreground">Every minute you put in, adding up.</p>
@@ -147,7 +147,7 @@ export default async function ProgressPage() {
         <h2 className="text-sm font-medium text-muted-foreground">
           Achievements · {ACHIEVEMENTS.filter((a) => unlockedAt.has(a.key)).length} of {ACHIEVEMENTS.length}
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="cram-stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ACHIEVEMENTS.map((a) => {
             const at = unlockedAt.get(a.key);
             const [current, target] = a.progress(stats);
@@ -164,7 +164,7 @@ export default async function ProgressPage() {
                   ) : (
                     <div className="mt-0.5 flex items-center gap-2">
                       <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted-foreground/15">
-                        <div className="h-full rounded-full bg-gold/70" style={{ width: `${(current / target) * 100}%` }} />
+                        <div className="cram-grow-x h-full rounded-full bg-gold/70" style={{ width: `${(current / target) * 100}%` }} />
                       </div>
                       <span className="text-[11px] tabular-nums text-muted-foreground">
                         {current}/{target}

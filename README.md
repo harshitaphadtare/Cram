@@ -53,6 +53,13 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
 
 A day counts toward your streak after a focus session, a quiz, or 5 minutes of writing notes.
 
+### Accounts
+- Email/password sign-up with a **strong-password policy**: at least 10 characters with upper-
+  and lowercase letters, a number and a symbol, shown as a live checklist and strength meter.
+- **Forgot password**: `/forgot-password` emails a reset link, which leads to
+  `/reset-password` to choose a new password. The link must be opened in the same browser that
+  requested it.
+
 ### Collaboration
 Folders can be shared with other Cram users as **Viewer** (read and quiz), **Editor** (edit
 pages) or **Admin** (also manage members). Quizzes, streaks, XP, to-dos and roadmaps are always
@@ -75,9 +82,13 @@ personal.
 3. **Project Settings → Database → Connection string**: copy the **Transaction pooler** string
    (port 6543) for `DATABASE_URL`, and the **Session pooler / direct** string (port 5432) for
    `DIRECT_URL`.
-4. **Authentication → URL Configuration**: add `http://localhost:3000/auth/callback` (and your
-   production URL later) to the redirect URLs.
-5. **Storage**: create a **public** bucket named `page-uploads`.
+4. **Authentication → URL Configuration**: add `http://localhost:3000/**` (and the same for
+   your production URL later) to the redirect URLs. Sign-up confirmation and password-reset
+   emails both return through `/auth/callback`.
+5. **Authentication → Providers → Email → Password requirements**: set the minimum length to
+   **10** and require lowercase, uppercase, digits and symbols. The sign-up, reset and
+   change-password forms enforce the same rules, but this makes Supabase enforce them too.
+6. **Storage**: create a **public** bucket named `page-uploads`.
 
 ### 2. Gemini
 Create a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey).

@@ -64,7 +64,7 @@ function MasteryBar({ value }: { value: number }) {
     <div className="h-1 w-16 overflow-hidden rounded-full bg-muted-foreground/15">
       <div
         className={cn(
-          "h-full rounded-full",
+          "cram-grow-x h-full rounded-full",
           value >= 80 ? "bg-chart-3" : value >= 50 ? "bg-gold" : "bg-streak",
         )}
         style={{ width: `${Math.max(4, value)}%` }}
@@ -178,7 +178,7 @@ export default async function DashboardPage() {
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-8">
+        <div className="cram-stagger flex min-w-0 flex-col gap-8">
           {/* Today: goal ring + streak */}
           <section className="flex flex-col gap-6 rounded-xl border bg-card p-5 sm:flex-row sm:items-center sm:gap-8">
             <div className="flex items-center gap-4">
@@ -321,7 +321,7 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <aside className="flex flex-col gap-6">
+        <aside className="cram-stagger flex flex-col gap-6">
           <section className="flex flex-col gap-3">
             <SectionHeader
               icon={Trophy}
@@ -352,7 +352,7 @@ export default async function DashboardPage() {
                       </span>
                     </div>
                     <div className="h-1 overflow-hidden rounded-full bg-muted-foreground/15">
-                      <div className="h-full rounded-full bg-gold" style={{ width: `${Math.max(3, ratio * 100)}%` }} />
+                      <div className="cram-grow-x h-full rounded-full bg-gold" style={{ width: `${Math.max(3, ratio * 100)}%` }} />
                     </div>
                   </div>
                 </div>

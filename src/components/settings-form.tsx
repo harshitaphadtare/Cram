@@ -19,6 +19,8 @@ import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfileName, updateTimezone, updateAvatarUrl } from "@/app/actions/profile";
 import { logOut } from "@/lib/log-out";
+import { checkPassword } from "@/lib/password";
+import { PasswordInput, PasswordStrength } from "@/components/auth/password-field";
 
 const TIMEZONES: string[] =
   typeof Intl.supportedValuesOf === "function"
@@ -99,8 +101,8 @@ export function SettingsForm({
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      toast.error("Password must be at least 6 characters.");
+    if (!checkPassword(newPassword).isStrong) {
+      toast.error("Choose a stronger password — it needs to meet every requirement.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -195,20 +197,22 @@ export function SettingsForm({
           <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="new-password">New password</Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 6 characters"
                 autoComplete="new-password"
               />
+              {newPassword && (
+                <div className="pt-1 animate-in fade-in">
+                  <PasswordStrength password={newPassword} />
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="confirm-password">Confirm new password</Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
@@ -216,7 +220,11 @@ export function SettingsForm({
             </div>
             <Button
               type="submit"
-              disabled={changingPassword || !newPassword || !confirmPassword}
+              disabled={
+                changingPassword ||
+                !checkPassword(newPassword).isStrong ||
+                newPassword !== confirmPassword
+              }
               className="w-fit"
             >
               {changingPassword && <Loader2 className="size-4 animate-spin" />}

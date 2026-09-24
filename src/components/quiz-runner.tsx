@@ -59,7 +59,8 @@ export function QuizRunner({
         <Progress value={(answeredCount / questions.length) * 100} />
       </div>
 
-      <Card>
+      {/* Keyed by question so each one slides in as you move through the quiz. */}
+      <Card key={question.id} className="animate-in fade-in slide-in-from-right-2 duration-300">
         <CardContent className="flex flex-col gap-4 py-6">
           <p className="text-lg font-medium">{question.questionText}</p>
 
@@ -72,7 +73,7 @@ export function QuizRunner({
                   type="button"
                   onClick={() => handleSelect(option)}
                   className={cn(
-                    "rounded-lg border p-3 text-left text-sm transition",
+                    "rounded-lg border p-3 text-left text-sm transition-all duration-150 active:scale-[0.99]",
                     isSelected ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted",
                   )}
                 >

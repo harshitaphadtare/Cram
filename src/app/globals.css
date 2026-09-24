@@ -265,3 +265,69 @@
 .bn-editor .bn-block-column:last-child {
   padding-right: 0;
 }
+
+/* ---------- Motion ----------
+ * One calm vocabulary used everywhere: things fade up into place, bars grow from the left, rings
+ * fill. Durations stay short (200–500ms) with ease-out so the app feels quick, never floaty. */
+@keyframes cram-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cram-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes cram-ring-fill {
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+}
+
+/* Route content fades up on every navigation (see PageTransition). */
+.cram-page-enter {
+  animation: cram-fade-up 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Children enter one after another. Put on a flex/grid container. */
+.cram-stagger > * {
+  animation: cram-fade-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.cram-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.cram-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.cram-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.cram-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.cram-stagger > *:nth-child(6) { animation-delay: 250ms; }
+.cram-stagger > *:nth-child(n + 7) { animation-delay: 300ms; }
+
+/* Progress bars grow in from the left on mount. */
+.cram-grow-x {
+  transform-origin: left center;
+  animation: cram-grow-x 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 150ms;
+}
+
+/* Rings fill from empty on mount; set --ring-circumference inline. */
+.cram-ring-fill {
+  animation: cram-ring-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 150ms;
+}
+
+/* Respect the OS "reduce motion" setting everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

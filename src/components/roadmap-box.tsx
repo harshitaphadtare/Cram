@@ -139,7 +139,7 @@ export function RoadmapBox({
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
                 <div
-                  className={cn("h-full rounded-full transition-[width] duration-500", percent === 100 ? "bg-chart-3" : "bg-primary")}
+                  className={cn("cram-grow-x h-full rounded-full transition-[width] duration-500", percent === 100 ? "bg-chart-3" : "bg-primary")}
                   style={{ width: `${percent}%` }}
                 />
               </div>

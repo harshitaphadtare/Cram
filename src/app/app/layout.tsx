@@ -11,6 +11,7 @@ import { PomodoroProvider } from "@/components/pomodoro/pomodoro-provider";
 import { MiniTimer } from "@/components/pomodoro/mini-timer";
 import { getTodayWorkSessionCount } from "@/app/actions/pomodoro";
 import { SubjectsProvider } from "@/components/subjects";
+import { PageTransition } from "@/components/page-transition";
 import { prisma } from "@/lib/prisma";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -53,8 +54,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 px-4 pt-6 pb-16 md:px-10 md:pt-10">
-            {children}
+          <div className="flex flex-1 flex-col px-4 pt-6 pb-16 md:px-10 md:pt-10">
+            <PageTransition>{children}</PageTransition>
           </div>
         </SidebarInset>
         <Celebrations items={celebrations} />

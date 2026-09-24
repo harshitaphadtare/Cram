@@ -34,7 +34,7 @@ export default async function QuizzesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="cram-stagger flex flex-col gap-2">
           {quizzes.map((quiz) => {
             const href =
               quiz.status === "completed"

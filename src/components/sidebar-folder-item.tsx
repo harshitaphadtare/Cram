@@ -92,34 +92,43 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
         </button>
       )}
 
-      {open && (
-        <ul className="flex flex-col gap-px py-px group-data-[collapsible=icon]:hidden">
-          {folder.pages.length === 0 ? (
-            <li className="py-1 pl-9 text-xs text-sidebar-foreground/50">No pages inside</li>
-          ) : (
-            folder.pages.map((page) => {
-              const pageHref = `${href}/pages/${page.id}`;
-              const active = pathname === pageHref;
-              return (
-                <li key={page.id}>
-                  <Link
-                    href={pageHref}
-                    className={cn(
-                      "flex h-7 items-center gap-2 rounded-md pr-2 pl-7 text-sm transition-colors",
-                      active
-                        ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                    )}
-                  >
-                    <FileText className="size-3.5 shrink-0 opacity-70" />
-                    <span className="truncate">{page.title || "Untitled"}</span>
-                  </Link>
-                </li>
-              );
-            })
-          )}
-        </ul>
-      )}
+      {/* Always mounted so it can animate: grid rows 0fr ⇄ 1fr gives a smooth height transition. */}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows,opacity] duration-200 ease-out group-data-[collapsible=icon]:hidden",
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+        inert={!open}
+      >
+        <div className="overflow-hidden">
+          <ul className="flex flex-col gap-px py-px">
+            {folder.pages.length === 0 ? (
+              <li className="py-1 pl-9 text-xs text-sidebar-foreground/50">No pages inside</li>
+            ) : (
+              folder.pages.map((page) => {
+                const pageHref = `${href}/pages/${page.id}`;
+                const active = pathname === pageHref;
+                return (
+                  <li key={page.id}>
+                    <Link
+                      href={pageHref}
+                      className={cn(
+                        "flex h-7 items-center gap-2 rounded-md pr-2 pl-7 text-sm transition-colors",
+                        active
+                          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      )}
+                    >
+                      <FileText className="size-3.5 shrink-0 opacity-70" />
+                      <span className="truncate">{page.title || "Untitled"}</span>
+                    </Link>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      </div>
     </SidebarMenuItem>
   );
 }

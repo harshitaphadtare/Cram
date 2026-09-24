@@ -16,7 +16,7 @@ export function LevelProgress({ xp, className }: { xp: number; className?: strin
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted-foreground/15">
         <div
-          className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+          className="cram-grow-x h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
           style={{ width: `${Math.max(2, info.progress * 100)}%` }}
         />
       </div>

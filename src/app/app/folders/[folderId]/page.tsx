@@ -27,7 +27,7 @@ function MasteryPill({ value, due }: { value: number; due: boolean }) {
       <span className="h-1 w-14 overflow-hidden rounded-full bg-muted-foreground/15">
         <span
           className={cn(
-            "block h-full rounded-full",
+            "cram-grow-x block h-full rounded-full",
             value >= 80 ? "bg-chart-3" : value >= 50 ? "bg-gold" : "bg-streak",
           )}
           style={{ width: `${Math.max(4, value)}%` }}
@@ -127,7 +127,7 @@ export default async function FolderPage({
       </div>
 
       {/* items-start: the page list shouldn't stretch to the height of the sidebar boxes. */}
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="cram-stagger grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         {folder.pages.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-16 text-center text-muted-foreground">
             <FileText className="size-8" />
@@ -167,7 +167,7 @@ export default async function FolderPage({
           </div>
         )}
 
-        <aside className="flex flex-col gap-6">
+        <aside className="cram-stagger flex flex-col gap-6">
           <section className="flex flex-col overflow-hidden rounded-xl border bg-card">
             <header className="flex items-center justify-between gap-2 border-b px-4 py-2.5">
               <h2 className="flex items-center gap-2 text-sm font-medium">

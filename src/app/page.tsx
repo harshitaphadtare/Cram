@@ -152,7 +152,7 @@ export default async function LandingPage() {
       </header>
 
       <main>
-        <section className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 pt-20 pb-16 text-center sm:px-6 sm:pt-28">
+        <section className="cram-stagger mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 pt-20 pb-16 text-center sm:px-6 sm:pt-28">
           <span className="flex items-center gap-2 rounded-full border px-3 py-1 text-xs text-muted-foreground">
             <Sparkles className="size-3.5 text-primary" />
             Notes, quizzes and focus in one place
@@ -182,7 +182,7 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="px-4 pb-24 sm:px-6">
+        <section className="cram-page-enter px-4 pb-24 [animation-delay:250ms] sm:px-6">
           <HeroPreview />
         </section>
 
@@ -194,7 +194,7 @@ export default async function LandingPage() {
                 Most study apps help you take notes. Cram helps you keep what&apos;s in them.
               </p>
             </div>
-            <div className="grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
+            <div className="cram-stagger grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map(({ icon: Icon, title, body }) => (
                 <div key={title} className="flex flex-col gap-3 bg-background p-6">
                   <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-foreground">

@@ -43,7 +43,7 @@ export default async function PlannerPage() {
           <p>Nothing on your plate. Add a task above.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="cram-stagger flex flex-col gap-6">
           {sections.map((section) => (
             <div key={section.label} className="flex flex-col gap-2">
               <h2

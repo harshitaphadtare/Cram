@@ -33,7 +33,11 @@ export function GoalRing({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - progress)}
-          className={cn("transition-[stroke-dashoffset] duration-700 ease-out", done ? "stroke-chart-3" : "stroke-primary")}
+          style={{ "--ring-circumference": c } as React.CSSProperties}
+          className={cn(
+            "cram-ring-fill transition-[stroke-dashoffset] duration-700 ease-out",
+            done ? "stroke-chart-3" : "stroke-primary",
+          )}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">

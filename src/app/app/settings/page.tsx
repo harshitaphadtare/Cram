@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { SettingsForm } from "@/components/settings-form";
 import { StudyPreferences } from "@/components/study-preferences";
-import { ResetProgress } from "@/components/reset-progress";
+import { AccountActions } from "@/components/account-actions";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -27,8 +27,8 @@ export default async function SettingsPage() {
         }}
       />
 
-      {/* Destructive, so it sits last. */}
-      <ResetProgress xp={user.xp} streak={user.streakCount} />
+      {/* Log out and the destructive reset sit last. */}
+      <AccountActions />
     </div>
   );
 }

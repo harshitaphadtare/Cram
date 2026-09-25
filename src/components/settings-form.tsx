@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Camera, Loader2, LogOut } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/client";
 import { updateProfileName, updateTimezone, updateAvatarUrl } from "@/app/actions/profile";
-import { logOut } from "@/lib/log-out";
 import { checkPassword } from "@/lib/password";
 import { assertUploadSize } from "@/lib/uploads";
 import { PasswordInput, PasswordStrength } from "@/components/auth/password-field";
@@ -261,17 +259,6 @@ export function SettingsForm({
           </div>
         </CardContent>
       </Card>
-
-      <Separator />
-
-      <Button
-        variant="outline"
-        className="w-fit gap-1.5 text-destructive hover:text-destructive"
-        onClick={logOut}
-      >
-        <LogOut className="size-4" />
-        Log out
-      </Button>
     </div>
   );
 }

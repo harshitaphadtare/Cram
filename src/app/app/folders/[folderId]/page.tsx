@@ -17,6 +17,7 @@ import { FolderSettingsMenu } from "@/components/folder-settings-menu";
 import { ReviewButton } from "@/components/gamification/review-button";
 import { RoadmapBox } from "@/components/roadmap-box";
 import { NewTaskForm } from "@/components/new-task-form";
+import { userToday } from "@/lib/gamification";
 import { TaskItem } from "@/components/task-item";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
@@ -68,7 +69,14 @@ export default async function FolderPage({
       orderBy: { order: "asc" },
     }),
     prisma.task.findMany({
-      where: { userId: user.id, folderId: folder.id, completed: false },
+      where: {
+        userId: user.id,
+        folderId: folder.id,
+        completed: false,
+        // A repeating task ticked off today has rolled to a later day — it's done for now, so
+        // keep it off the to-do list until that day comes round.
+        OR: [{ recurring: false }, { dueDate: null }, { dueDate: { lte: userToday(user.timezone) } }],
+      },
       orderBy: [{ dueDate: "asc" }, { order: "asc" }],
     }),
   ]);

@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { CalendarIcon, Loader2, Repeat, Trash2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+import { AlignLeft, CalendarIcon, Check, Loader2, Pencil, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { PRIORITY_META, PRIORITY_ORDER } from "@/lib/task-priority";
 import { TaskPriority } from "@/generated/prisma/enums";
 import { deleteTask, toggleTask, updateTask } from "@/app/actions/tasks";
-import { dateOnlyFromLocalDate, toLocalCalendarDate, todayDateOnly } from "@/lib/date-only";
+import { dateOnlyFromLocalDate, relativeDayLabel, toLocalCalendarDate, todayDateOnly } from "@/lib/date-only";
 import { playTaskCompleteSound } from "@/lib/sounds";
 import { SubjectDot, SubjectSelect } from "@/components/subjects";
 
@@ -49,6 +48,11 @@ export interface TaskView {
   recurring: boolean;
   folderId?: string | null;
   folder?: { id: string; name: string; color: string } | null;
+}
+
+/** Card that holds a list of task rows, separated by hairlines. */
+export function TaskList({ children }: { children: React.ReactNode }) {
+  return <div className="divide-y overflow-hidden rounded-xl border bg-card">{children}</div>;
 }
 
 export function TaskItem({
@@ -76,6 +80,11 @@ export function TaskItem({
     startTransition(async () => {
       try {
         await toggleTask(task.id, checked);
+        if (checked && task.recurring) {
+          // The task comes back with tomorrow's date rather than disappearing — show it again.
+          setVanishing(false);
+          toast.success("Done for today — it's back tomorrow.");
+        }
       } catch {
         toast.error("Couldn't update the task.");
         setVanishing(false);
@@ -101,7 +110,11 @@ export function TaskItem({
           priority,
           recurring,
           folderId,
-          dueDate: recurring ? null : dueDate ? dateOnlyFromLocalDate(dueDate) : null,
+          dueDate: dueDate
+            ? dateOnlyFromLocalDate(dueDate)
+            : recurring
+              ? dateOnlyFromLocalDate(new Date())
+              : null,
         });
         setEditOpen(false);
       } catch {
@@ -123,6 +136,9 @@ export function TaskItem({
   const meta = PRIORITY_META[task.priority];
   const overdue = task.dueDate && !task.completed && task.dueDate < todayDateOnly();
   const displayDueDate = task.dueDate ? toLocalCalendarDate(task.dueDate) : null;
+  const dueLabel = displayDueDate ? relativeDayLabel(displayDueDate) : null;
+  const done = task.completed || vanishing;
+  const hasMeta = Boolean(dueLabel || task.recurring || task.description);
 
   return (
     <>
@@ -135,52 +151,101 @@ export function TaskItem({
         <div className="overflow-hidden">
           <div
             className={cn(
-              "group flex items-center gap-3 rounded-lg transition-all duration-300 ease-in-out",
-              plain ? "px-2 py-1.5 hover:bg-accent" : "border bg-card px-3 py-2.5",
-              vanishing && "scale-95 opacity-0",
+              "group flex items-center gap-3 transition-all duration-300 ease-in-out",
+              plain ? "rounded-lg px-2 py-2 hover:bg-accent" : "px-4 py-3 hover:bg-muted/40",
+              vanishing && "scale-[0.98] opacity-0",
             )}
           >
-            <Checkbox checked={task.completed} onCheckedChange={handleToggle} disabled={pending} />
-            <span className={cn("size-1.5 shrink-0 rounded-full", meta.dot)} />
-            {task.recurring && (
-              <Repeat className="size-3.5 shrink-0 text-primary" aria-label="Repeats every day" />
-            )}
+            {/* Round, priority-coloured checkbox (Todoist-style): the ring says how urgent it is. */}
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={done}
+              aria-label={done ? "Mark as not done" : "Mark as done"}
+              disabled={pending}
+              onClick={() => handleToggle(!task.completed)}
+              className={cn(
+                "group/check flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors disabled:opacity-60",
+                meta.check,
+                done && cn(meta.dot, "border-transparent text-background"),
+              )}
+            >
+              <Check
+                strokeWidth={3}
+                className={cn(
+                  "size-2.5 transition-opacity",
+                  done ? "opacity-100" : "opacity-0 group-hover/check:opacity-100",
+                )}
+              />
+            </button>
+
             <button
               type="button"
               onClick={() => setEditOpen(true)}
-              className={cn(
-                "flex-1 truncate text-left text-sm transition-all duration-300",
-                (task.completed || vanishing) && "text-muted-foreground line-through",
-              )}
+              className="flex min-w-0 flex-1 flex-col gap-1 text-left"
             >
-              {task.title}
-            </button>
-            {task.folder && !hideSubject && (
-              <span className="hidden max-w-32 shrink-0 items-center gap-1.5 truncate text-xs text-muted-foreground sm:flex">
-                <SubjectDot color={task.folder.color} />
-                <span className="truncate">{task.folder.name}</span>
-              </span>
-            )}
-            {displayDueDate && (
               <span
                 className={cn(
-                  "shrink-0 text-xs",
-                  overdue ? "text-destructive" : "text-muted-foreground",
+                  "truncate text-sm leading-[18px] transition-colors duration-300",
+                  done && "text-muted-foreground line-through",
                 )}
               >
-                {format(displayDueDate, "MMM d")}
+                {task.title}
               </span>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-              onClick={handleDelete}
-              disabled={pending}
-              aria-label="Delete task"
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+              {hasMeta && (
+                <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                  {dueLabel && (
+                    <span
+                      className={cn(
+                        "flex items-center gap-1",
+                        overdue && "text-destructive",
+                        !overdue && dueLabel === "Today" && "text-[oklch(0.7_0.14_155)]",
+                      )}
+                    >
+                      <CalendarIcon className="size-3" />
+                      {dueLabel}
+                    </span>
+                  )}
+                  {task.recurring && (
+                    <span className="flex items-center gap-1">
+                      <Repeat className="size-3" />
+                      Daily
+                    </span>
+                  )}
+                  {task.description && <AlignLeft className="size-3" aria-label="Has notes" />}
+                </span>
+              )}
+            </button>
+
+            <div className="flex shrink-0 items-center gap-1">
+              <div className="flex items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground"
+                  onClick={() => setEditOpen(true)}
+                  aria-label="Edit task"
+                >
+                  <Pencil />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={handleDelete}
+                  disabled={pending}
+                  aria-label="Delete task"
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+              {task.folder && !hideSubject && (
+                <span className="hidden max-w-40 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+                  <span className="truncate">{task.folder.name}</span>
+                  <SubjectDot color={task.folder.color} />
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -212,7 +277,10 @@ export function TaskItem({
                   <SelectContent>
                     {PRIORITY_ORDER.map((p) => (
                       <SelectItem key={p} value={p}>
-                        {PRIORITY_META[p].label}
+                        <span className="flex items-center gap-2">
+                          <span className={cn("size-2 rounded-full", PRIORITY_META[p].dot)} />
+                          {PRIORITY_META[p].label}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -251,7 +319,7 @@ export function TaskItem({
                 <Repeat className="size-4 text-muted-foreground" />
                 <div>
                   <Label className="font-normal">Repeats every day</Label>
-                  <p className="text-xs text-muted-foreground">Shown with a repeat icon, no fixed due date.</p>
+                  <p className="text-xs text-muted-foreground">Moves to the next day each time you tick it off.</p>
                 </div>
               </div>
               <Switch checked={recurring} onCheckedChange={setRecurring} />

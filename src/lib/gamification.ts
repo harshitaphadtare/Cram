@@ -211,20 +211,29 @@ async function recordLevelUps(userId: string, oldXp: number, newXp: number) {
 }
 
 export async function getAchievementStats(userId: string): Promise<AchievementStats> {
-  const [user, focus, quizzes, pagesCreated, goalDays, studyDays, bestReview] = await Promise.all([
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { longestStreak: true, xp: true } }),
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { longestStreak: true, xp: true, progressResetAt: true },
+  });
+  // After "Reset progress", only activity since the reset counts (notes/quizzes themselves are kept).
+  const since = user.progressResetAt ?? undefined;
+  const [focus, quizzes, pagesCreated, goalDays, studyDays, bestReview] = await Promise.all([
     prisma.pomodoroSession.aggregate({
-      where: { userId, type: PomodoroType.WORK, completed: true },
+      where: { userId, type: PomodoroType.WORK, completed: true, startedAt: { gte: since } },
       _sum: { durationMin: true },
     }),
     prisma.quiz.findMany({
-      where: { userId, status: "completed" },
+      where: { userId, status: "completed", completedAt: { gte: since } },
       select: { correctCount: true, totalQuestions: true },
     }),
-    prisma.page.count({ where: { createdById: userId } }),
+    prisma.page.count({ where: { createdById: userId, createdAt: { gte: since } } }),
     prisma.streakLog.count({ where: { userId, goalMet: true } }),
     prisma.streakLog.count({ where: { userId, studied: true } }),
-    prisma.pageReview.findFirst({ where: { userId }, orderBy: { mastery: "desc" }, select: { mastery: true } }),
+    prisma.pageReview.findFirst({
+      where: { userId, lastReviewedAt: { gte: since } },
+      orderBy: { mastery: "desc" },
+      select: { mastery: true },
+    }),
   ]);
 
   return {

@@ -40,6 +40,8 @@ export async function getTodayWorkSessionCount(): Promise<number> {
   const user = await requireUser();
   const start = new Date();
   start.setHours(0, 0, 0, 0);
+  // Sessions from before a same-day progress reset don't count.
+  if (user.progressResetAt && user.progressResetAt > start) start.setTime(user.progressResetAt.getTime());
 
   return prisma.pomodoroSession.count({
     where: {

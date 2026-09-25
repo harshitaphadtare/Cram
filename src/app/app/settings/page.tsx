@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { SettingsForm } from "@/components/settings-form";
 import { StudyPreferences } from "@/components/study-preferences";
+import { AccountActions } from "@/components/account-actions";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -25,6 +26,9 @@ export default async function SettingsPage() {
           timezone: user.timezone,
         }}
       />
+
+      {/* Log out and the destructive reset sit last. */}
+      <AccountActions />
     </div>
   );
 }

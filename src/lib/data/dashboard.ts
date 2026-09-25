@@ -7,6 +7,8 @@ import { addDays, checkAchievements, getAchievementStats, userToday } from "@/li
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+const maxDate = (a: Date, b: Date | null) => (b && b > a ? b : a);
+
 export type DayStatus = "studied" | "frozen" | "partial" | "none" | "today";
 
 /** Everything the home dashboard shows beyond folders and tasks, fetched in parallel. */
@@ -36,12 +38,12 @@ export async function getDashboardData(user: User, folderIds: string[]) {
           userId: user.id,
           type: PomodoroType.WORK,
           completed: true,
-          startedAt: { gte: new Date(Date.now() - WEEK_MS) },
+          startedAt: { gte: maxDate(new Date(Date.now() - WEEK_MS), user.progressResetAt) },
         },
         _sum: { durationMin: true },
       }),
       prisma.quiz.findMany({
-        where: { userId: user.id, status: "completed" },
+        where: { userId: user.id, status: "completed", completedAt: { gte: user.progressResetAt ?? undefined } },
         select: { correctCount: true, totalQuestions: true },
       }),
       prisma.streakLog.findMany({

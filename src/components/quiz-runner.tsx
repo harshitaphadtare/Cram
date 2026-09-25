@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -10,23 +10,80 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { submitFullQuiz } from "@/app/actions/quiz";
 
+/** In-progress answers are kept per quiz in localStorage, so leaving the page (switching app
+ * tabs, checking notes, reloading) doesn't throw away what's been answered. */
+const progressKey = (quizId: string) => `cram.quiz-progress.${quizId}`;
+
+interface SavedProgress {
+  index: number;
+  answers: Record<string, string>;
+}
+
+function loadProgress(quizId: string, questions: QuizQuestionView[]): SavedProgress | null {
+  try {
+    const raw = window.localStorage.getItem(progressKey(quizId));
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as SavedProgress;
+    // Keep only answers that still match a question and one of its options.
+    const answers: Record<string, string> = {};
+    for (const q of questions) {
+      const a = saved.answers?.[q.id];
+      if (typeof a === "string" && q.options.includes(a)) answers[q.id] = a;
+    }
+    const index = Number.isInteger(saved.index)
+      ? Math.min(Math.max(saved.index, 0), questions.length - 1)
+      : 0;
+    return { index, answers };
+  } catch {
+    return null;
+  }
+}
+
+function saveProgress(quizId: string, progress: SavedProgress) {
+  try {
+    window.localStorage.setItem(progressKey(quizId), JSON.stringify(progress));
+  } catch {
+    // Storage unavailable — progress just won't survive leaving the page.
+  }
+}
+
+function clearProgress(quizId: string) {
+  try {
+    window.localStorage.removeItem(progressKey(quizId));
+  } catch {}
+}
+
 interface QuizQuestionView {
   id: string;
   questionText: string;
   options: string[];
 }
 
-export function QuizRunner({
-  quizId,
-  questions,
-}: {
+const noopSubscribe = () => () => {};
+
+interface QuizRunnerProps {
   quizId: string;
   questions: QuizQuestionView[];
-}) {
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+}
+
+export function QuizRunner(props: QuizRunnerProps) {
+  // Saved progress lives in localStorage, which the server can't see — so the runner only renders
+  // in the browser, where it can start from the saved question instead of flashing question 1.
+  const inBrowser = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  if (!inBrowser) return <div className="mx-auto min-h-96 w-full max-w-2xl" />;
+  return <QuizRunnerInner {...props} />;
+}
+
+function QuizRunnerInner({ quizId, questions }: QuizRunnerProps) {
+  const [initial] = useState(() => loadProgress(quizId, questions));
+  const [index, setIndex] = useState(initial?.index ?? 0);
+  const [answers, setAnswers] = useState<Record<string, string>>(initial?.answers ?? {});
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+
+  useEffect(() => {
+    saveProgress(quizId, { index, answers });
+  }, [quizId, index, answers]);
 
   const question = questions[index];
   const isLast = index === questions.length - 1;
@@ -40,6 +97,7 @@ export function QuizRunner({
     startTransition(async () => {
       try {
         await submitFullQuiz(quizId, answers);
+        clearProgress(quizId);
         router.push(`/app/quiz/${quizId}/results`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Couldn't submit the quiz.");

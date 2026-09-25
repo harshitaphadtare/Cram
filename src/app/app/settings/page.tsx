@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { SettingsForm } from "@/components/settings-form";
 import { StudyPreferences } from "@/components/study-preferences";
+import { ResetProgress } from "@/components/reset-progress";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -25,6 +26,9 @@ export default async function SettingsPage() {
           timezone: user.timezone,
         }}
       />
+
+      {/* Destructive, so it sits last. */}
+      <ResetProgress xp={user.xp} streak={user.streakCount} />
     </div>
   );
 }

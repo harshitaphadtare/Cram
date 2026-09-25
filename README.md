@@ -46,6 +46,8 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
 - **XP and levels**, **17 achievements**, and celebration popups for unlocks and level-ups.
 - **Progress page**: level, stats, 12-week activity heatmap and every achievement.
 - **Weekly leaderboards** in shared folders (opt out in Settings).
+- **Reset progress** (Settings): start streak, XP, level, achievements and study stats over from
+  zero, behind a type-RESET confirmation. Notes, folders, tasks and quiz history are kept.
 
 | Action | XP |
 | --- | --- |

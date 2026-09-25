@@ -1,4 +1,4 @@
-// Prisma schema for Cram — the AI study buddy app.
+// Prisma schema for Cram â€” the AI study buddy app.
 // Database: Postgres (Supabase). Auth is handled by Supabase Auth;
 // the User model here mirrors auth.users (same id) plus app-specific profile/streak data.
 
@@ -61,6 +61,8 @@ model User {
   showOnLeaderboard Boolean   @default(true)
   /// Set when the user finishes or skips the product tour; null means show it.
   onboardedAt       DateTime?
+  /// Set by "Reset progress": XP, streaks and achievements only count activity after this.
+  progressResetAt   DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -207,7 +209,7 @@ model Task {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  /// Optional subject (folder) the task belongs to — tagged tasks show in the dashboard to-do box.
+  /// Optional subject (folder) the task belongs to â€” tagged tasks show in the dashboard to-do box.
   folderId String?
   folder   Folder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
@@ -235,7 +237,7 @@ model PomodoroSession {
   @@map("pomodoro_sessions")
 }
 
-/// One row per calendar day (user's timezone) with any study activity — doubles as the daily
+/// One row per calendar day (user's timezone) with any study activity â€” doubles as the daily
 /// activity log for the goal ring, XP history and weekly leaderboards.
 model StreakLog {
   id      String   @id @default(cuid())
@@ -277,7 +279,7 @@ model PageReview {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   pageId         String
   page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  /// 0–100 estimate of how well the user knows this page.
+  /// 0â€“100 estimate of how well the user knows this page.
   mastery        Int      @default(0)
   intervalDays   Float    @default(1)
   dueAt          DateTime
@@ -288,7 +290,7 @@ model PageReview {
   @@map("page_reviews")
 }
 
-/// A topic on a student's roadmap for a subject (folder) — their personal syllabus checklist.
+/// A topic on a student's roadmap for a subject (folder) â€” their personal syllabus checklist.
 model RoadmapItem {
   id          String    @id @default(cuid())
   userId      String

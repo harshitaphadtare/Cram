@@ -66,6 +66,18 @@ export function NewTaskForm({
     setDueDate(date);
   }
 
+  // Todoist-style: Backspace right after a highlighted phrase first un-highlights it (keeping the
+  // text) instead of deleting a character. The next Backspace deletes as normal.
+  function handleTitleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Backspace" || !detected.match) return;
+    const { selectionStart, selectionEnd } = e.currentTarget;
+    const end = detected.match.index + detected.match.text.length;
+    if (selectionStart === selectionEnd && selectionStart === end) {
+      e.preventDefault();
+      keepAsText();
+    }
+  }
+
   function syncMirrorScroll(e: React.SyntheticEvent<HTMLInputElement>) {
     if (mirrorRef.current) mirrorRef.current.scrollLeft = e.currentTarget.scrollLeft;
   }
@@ -175,6 +187,7 @@ export function NewTaskForm({
             handleTitleChange(e.target.value);
             syncMirrorScroll(e);
           }}
+          onKeyDown={handleTitleKeyDown}
           onScroll={syncMirrorScroll}
           onSelect={syncMirrorScroll}
           placeholder="What do you need to do?"
@@ -187,7 +200,7 @@ export function NewTaskForm({
       </div>
       <p className="px-4 text-xs text-muted-foreground/70">
         {detected.match
-          ? "Date picked up from your text. Hit × on the date to keep it as plain text."
+          ? "Date picked up from your text. Press Backspace to keep it as plain text."
           : "Tip: type “tomorrow”, “friday” or “every day” and the date is set for you."}
       </p>
 

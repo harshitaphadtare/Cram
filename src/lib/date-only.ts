@@ -29,3 +29,20 @@ export function todayDateOnly(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
 }
+
+/** "Today" / "Tomorrow" / "Yesterday", otherwise a short weekday + date, for a local calendar date. */
+export function relativeDayLabel(date: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diff = Math.round((day.getTime() - today.getTime()) / 86_400_000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff === -1) return "Yesterday";
+  return day.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(day.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+  });
+}

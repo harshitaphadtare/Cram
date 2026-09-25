@@ -21,7 +21,7 @@ import { listTasksForUser } from "@/lib/data/tasks";
 import { getDashboardData } from "@/lib/data/dashboard";
 import { folderDotClass } from "@/lib/folder-colors";
 import { NewFolderDialog } from "@/components/new-folder-dialog";
-import { TaskItem } from "@/components/task-item";
+import { TaskItem, TaskList } from "@/components/task-item";
 import { Button } from "@/components/ui/button";
 import { GoalRing } from "@/components/gamification/goal-ring";
 import { LevelProgress } from "@/components/gamification/level-progress";
@@ -296,11 +296,11 @@ export default async function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5">
+              <TaskList>
                 {todaysTasks.map((task) => (
                   <TaskItem key={task.id} task={task} />
                 ))}
-              </div>
+              </TaskList>
             )}
           </section>
 

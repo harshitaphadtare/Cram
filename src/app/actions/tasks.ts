@@ -5,7 +5,7 @@ import { creditActivity } from "@/lib/gamification";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TaskPriority } from "@/generated/prisma/enums";
-import { dateOnlyStringToUTCDate } from "@/lib/date-only";
+import { dateOnlyStringToUTCDate, todayDateOnly } from "@/lib/date-only";
 import { getFolderRole, roleAtLeast } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
 
@@ -39,8 +39,13 @@ export async function createTask(input: {
     data: {
       userId: user.id,
       title,
-      dueDate: input.dueDate ? dateOnlyStringToUTCDate(input.dueDate) : null,
-      priority: input.priority ?? TaskPriority.P4,
+      // A repeating task always has a next occurrence — it starts today unless told otherwise.
+      dueDate: input.dueDate
+        ? dateOnlyStringToUTCDate(input.dueDate)
+        : input.recurring
+          ? todayDateOnly()
+          : null,
+      priority: input.priority ?? TaskPriority.P3,
       recurring: input.recurring ?? false,
       folderId: input.folderId ?? null,
       order: (maxOrder._max.order ?? -1) + 1,
@@ -59,10 +64,23 @@ export async function toggleTask(taskId: string, completed: boolean) {
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
   if (task.userId !== user.id) throw new Error("Not your task.");
 
-  await prisma.task.update({
-    where: { id: taskId },
-    data: { completed, completedAt: completed ? new Date() : null },
-  });
+  if (completed && task.recurring) {
+    // Repeating tasks never stay done: ticking one rolls it to the day after its due date
+    // (or after today, if it was overdue), ready to be done again.
+    const today = todayDateOnly();
+    const base = task.dueDate && task.dueDate > today ? task.dueDate : today;
+    const next = new Date(base);
+    next.setUTCDate(next.getUTCDate() + 1);
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { completed: false, completedAt: new Date(), dueDate: next },
+    });
+  } else {
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { completed, completedAt: completed ? new Date() : null },
+    });
+  }
 
   // Small reward for finishing tasks, capped per day so creating-and-ticking tasks can't farm XP.
   if (completed && !task.completed) {

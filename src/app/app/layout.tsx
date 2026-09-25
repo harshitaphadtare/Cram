@@ -14,6 +14,7 @@ import { SubjectsProvider } from "@/components/subjects";
 import { PageTransition } from "@/components/page-transition";
 import { ProductTour } from "@/components/product-tour";
 import { prisma } from "@/lib/prisma";
+import { TimezoneSync } from "@/components/timezone-sync";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -40,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <PomodoroProvider initialSessionsToday={sessionsToday}>
+      <TimezoneSync current={user.timezone} />
       <SubjectsProvider subjects={folders.map((f) => ({ id: f.id, name: f.name, color: f.color }))}>
       <SidebarProvider>
         <AppSidebar

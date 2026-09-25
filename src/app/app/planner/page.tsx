@@ -6,7 +6,7 @@ import { TaskItem, TaskList } from "@/components/task-item";
 import { TaskSortMenu } from "@/components/task-sort-menu";
 import { SubjectDot } from "@/components/subjects";
 import { CalendarCheck2 } from "lucide-react";
-import { todayDateOnly } from "@/lib/date-only";
+import { userToday } from "@/lib/gamification";
 import { groupTasks, parseTaskSort, TASK_SORT_COOKIE } from "@/lib/task-sort";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ export default async function PlannerPage() {
   const [tasks, cookieStore] = await Promise.all([listTasksForUser(user.id), cookies()]);
   const sort = parseTaskSort(cookieStore.get(TASK_SORT_COOKIE)?.value);
 
-  const today = todayDateOnly();
+  const today = userToday(user.timezone);
 
   // Repeating tasks made before they carried a date still belong on today's list.
   const active = tasks

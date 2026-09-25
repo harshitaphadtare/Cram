@@ -29,7 +29,7 @@ import { WeekStrip } from "@/components/gamification/week-strip";
 import { AchievementBadge } from "@/components/gamification/achievement-badge";
 import { ReviewButton } from "@/components/gamification/review-button";
 import { cn } from "@/lib/utils";
-import { todayDateOnly } from "@/lib/date-only";
+import { userToday } from "@/lib/gamification";
 import { formatGoal } from "@/lib/goals";
 
 function greetingFor(hour: number) {
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
     ),
   ]);
 
-  const today = todayDateOnly();
+  const today = userToday(user.timezone);
   const tomorrow = new Date(today);
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const todaysTasks = tasks

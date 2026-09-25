@@ -21,6 +21,20 @@ export async function updateTimezone(timezone: string) {
   revalidatePath("/app/settings");
 }
 
+/** Fills in the browser's timezone for users still on the "UTC" default, so "today" on the
+ * server matches the user's calendar. Never overrides a timezone picked in Settings. */
+export async function adoptBrowserTimezone(timezone: string) {
+  const user = await requireUser();
+  if (user.timezone !== "UTC" || !timezone || timezone === "UTC") return;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    return;
+  }
+  await prisma.user.update({ where: { id: user.id }, data: { timezone } });
+  revalidatePath("/app", "layout");
+}
+
 export async function updateAvatarUrl(avatarUrl: string) {
   const user = await requireUser();
   await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });

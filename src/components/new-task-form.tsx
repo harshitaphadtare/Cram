@@ -158,7 +158,7 @@ export function NewTaskForm({
           {detected.match ? (
             <>
               {title.slice(0, detected.match.index)}
-              <mark className="rounded-sm bg-primary/20 text-primary shadow-[0_0_0_2px] shadow-primary/20">
+              <mark className="rounded-[3px] bg-primary/15 text-primary">
                 {detected.match.text}
               </mark>
               {title.slice(detected.match.index + detected.match.text.length)}

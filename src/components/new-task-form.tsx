@@ -158,7 +158,9 @@ export function NewTaskForm({
           {detected.match ? (
             <>
               {title.slice(0, detected.match.index)}
-              <mark className="rounded-[3px] bg-primary/15 text-primary">
+              {/* Horizontal padding would push the text out of line with the input, so the tint is
+                  widened with side shadows instead; vertical padding doesn't affect layout inline. */}
+              <mark className="rounded-[4px] bg-primary/15 py-0.5 text-primary shadow-[-4px_0_0_var(--hl),4px_0_0_var(--hl)] [--hl:color-mix(in_oklab,var(--primary)_15%,transparent)]">
                 {detected.match.text}
               </mark>
               {title.slice(detected.match.index + detected.match.text.length)}

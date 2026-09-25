@@ -88,15 +88,21 @@ export function NewTaskForm({
     startTransition(async () => {
       try {
         const usesDetection = detected.recurring || detected.dueDate !== null;
+        const due = detected.recurring
+          ? dateOnlyFromLocalDate(new Date())
+          : (detected.dueDate ?? (dueDate ? dateOnlyFromLocalDate(dueDate) : null));
         await createTask({
           title: usesDetection ? detected.title : title,
           priority,
           folderId,
           recurring: detected.recurring,
-          dueDate: detected.recurring
-            ? dateOnlyFromLocalDate(new Date())
-            : (detected.dueDate ?? (dueDate ? dateOnlyFromLocalDate(dueDate) : null)),
+          dueDate: due,
         });
+        // The compact list only shows today's to-dos, so say where a later one went.
+        if (compact && due && due > dateOnlyFromLocalDate(new Date())) {
+          const day = relativeDayLabel(toLocalCalendarDate(dateOnlyStringToUTCDate(due)));
+          toast.success(`Scheduled for ${day === "Tomorrow" ? "tomorrow" : day} — it's in your Planner.`);
+        }
         setTitle("");
         setDismissed([]);
         setPriority(TaskPriority.P3);

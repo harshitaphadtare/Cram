@@ -8,7 +8,7 @@ import { describeLocation, type BreadcrumbFolder } from "@/components/app-breadc
 import { cn } from "@/lib/utils";
 
 /** Finds an in-app link from a click target, or null if the click wasn't on one. */
-function appLinkFrom(target: EventTarget | null): string | null {
+export function appLinkFrom(target: EventTarget | null): string | null {
   const anchor = (target as Element | null)?.closest?.("a[href]");
   if (!(anchor instanceof HTMLAnchorElement) || anchor.target === "_blank") return null;
   const url = new URL(anchor.href, window.location.href);

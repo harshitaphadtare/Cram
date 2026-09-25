@@ -8,7 +8,7 @@ export default async function PomodoroPage() {
   const [tasks, todayLog] = await Promise.all([
     prisma.task.findMany({
       where: { userId: user.id, completed: false },
-      select: { id: true, title: true },
+      select: { id: true, title: true, folder: { select: { id: true, name: true, color: true } } },
       orderBy: { order: "asc" },
       take: 50,
     }),

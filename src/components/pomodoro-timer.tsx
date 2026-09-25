@@ -8,7 +8,17 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SubjectDot } from "@/components/subjects";
 import { cn } from "@/lib/utils";
 import { formatGoal } from "@/lib/goals";
 import { formatClock, MODE_LABEL, usePomodoro, type Mode } from "@/components/pomodoro/pomodoro-provider";
@@ -79,19 +89,61 @@ function TimerSettings() {
   );
 }
 
-function TaskSelect({ tasks }: { tasks: { id: string; title: string }[] }) {
+interface LinkableTask {
+  id: string;
+  title: string;
+  folder: { id: string; name: string; color: string } | null;
+}
+
+/** Tasks grouped under their subject (A–Z), with subject-less tasks last. */
+function groupBySubject(tasks: LinkableTask[]) {
+  const groups = new Map<string, { folder: LinkableTask["folder"]; tasks: LinkableTask[] }>();
+  for (const task of tasks) {
+    const key = task.folder?.id ?? "";
+    if (!groups.has(key)) groups.set(key, { folder: task.folder, tasks: [] });
+    groups.get(key)!.tasks.push(task);
+  }
+  return [...groups.values()].sort((a, b) =>
+    !a.folder ? 1 : !b.folder ? -1 : a.folder.name.localeCompare(b.folder.name),
+  );
+}
+
+function TaskSelect({ tasks }: { tasks: LinkableTask[] }) {
   const { taskId, setTaskId } = usePomodoro();
   if (tasks.length === 0) return null;
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const groups = groupBySubject(tasks);
+
   return (
     <Select value={taskId ?? null} onValueChange={(v) => setTaskId(v ?? undefined)}>
-      <SelectTrigger size="sm" className="max-w-56 border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-accent hover:text-foreground">
-        <SelectValue placeholder="Link a task" />
+      <SelectTrigger size="sm" className="max-w-64 border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-accent hover:text-foreground">
+        <SelectValue placeholder="Link a task">
+          {(v: string | null) => {
+            const task = v ? byId.get(v) : undefined;
+            if (!task) return "Link a task";
+            return (
+              <span className="flex min-w-0 items-center gap-2">
+                {task.folder && <SubjectDot color={task.folder.color} />}
+                <span className="truncate">{task.title}</span>
+              </span>
+            );
+          }}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent align="end">
-        {tasks.map((t) => (
-          <SelectItem key={t.id} value={t.id}>
-            {t.title}
-          </SelectItem>
+      <SelectContent align="end" className="max-h-80">
+        {groups.map((group, i) => (
+          <SelectGroup key={group.folder?.id ?? "none"}>
+            {i > 0 && <SelectSeparator />}
+            <SelectLabel className="flex items-center gap-2">
+              {group.folder && <SubjectDot color={group.folder.color} />}
+              {group.folder?.name ?? "No subject"}
+            </SelectLabel>
+            {group.tasks.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.title}
+              </SelectItem>
+            ))}
+          </SelectGroup>
         ))}
       </SelectContent>
     </Select>
@@ -111,7 +163,7 @@ export function PomodoroTimer({
   goalMinutes,
   streak,
 }: {
-  tasks: { id: string; title: string }[];
+  tasks: LinkableTask[];
   todayMinutes: number;
   goalMinutes: number;
   streak: number;

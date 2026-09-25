@@ -264,7 +264,7 @@ export function TaskItem({
               <div className="flex flex-1 flex-col gap-2">
                 <Label>Priority</Label>
                 <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue>
               {(v: TaskPriority) => (
                 <span className="flex items-center gap-2">

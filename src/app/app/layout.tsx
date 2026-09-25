@@ -15,6 +15,7 @@ import { PageTransition } from "@/components/page-transition";
 import { ProductTour } from "@/components/product-tour";
 import { prisma } from "@/lib/prisma";
 import { TimezoneSync } from "@/components/timezone-sync";
+import { LinkContextMenu } from "@/components/link-context-menu";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -42,6 +43,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <PomodoroProvider initialSessionsToday={sessionsToday}>
       <TimezoneSync current={user.timezone} />
+      <LinkContextMenu />
       <SubjectsProvider subjects={folders.map((f) => ({ id: f.id, name: f.name, color: f.color }))}>
       <SidebarProvider>
         <AppSidebar

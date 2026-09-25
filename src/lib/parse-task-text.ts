@@ -3,6 +3,10 @@ import { dateOnlyFromLocalDate } from "@/lib/date-only";
 
 const RECURRING_PATTERN = /\b(every ?day|everyday|daily)\b/gi;
 
+/** "for 30 mins", "in 2 hours", "45m" — a length of time, not a due date. */
+const SUB_DAY_DURATION =
+  /^(?:for|in|within|after)?\s*(?:an?|\d+(?:\.\d+)?)\s*(?:s|secs?|seconds?|m|mins?|minutes?|h|hrs?|hours?)$/i;
+
 export interface ParsedTaskText {
   /** Title with any recognized date/recurrence phrase stripped out. */
   title: string;
@@ -31,10 +35,17 @@ export function parseTaskText(raw: string, ignore: string[] = []): ParsedTaskTex
     };
   }
 
-  // Use the first date-like phrase that wasn't dismissed and strip just that substring.
+  // Use the first phrase that names a day and wasn't dismissed, and strip just that substring.
+  // Durations and bare times ("for 30 mins", "at 5pm") parse as "some time today" in chrono,
+  // but they describe the task, not when it's due — so only phrases that pin a day count.
   const match = chrono
     .parse(raw, new Date(), { forwardDate: true })
-    .find((r) => !ignored.has(r.text.toLowerCase()));
+    .find(
+      (r) =>
+        !ignored.has(r.text.toLowerCase()) &&
+        !SUB_DAY_DURATION.test(r.text.trim()) &&
+        (r.start.isCertain("day") || r.start.isCertain("weekday")),
+    );
   if (!match) {
     return { title: raw.trim(), dueDate: null, recurring: false, match: null };
   }

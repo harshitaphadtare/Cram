@@ -18,6 +18,7 @@ import { ReviewButton } from "@/components/gamification/review-button";
 import { RoadmapBox } from "@/components/roadmap-box";
 import { NewTaskForm } from "@/components/new-task-form";
 import { userToday } from "@/lib/gamification";
+import { dueByTodayWhere } from "@/lib/data/tasks";
 import { TaskItem } from "@/components/task-item";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
@@ -72,10 +73,9 @@ export default async function FolderPage({
       where: {
         userId: user.id,
         folderId: folder.id,
-        completed: false,
-        // A repeating task ticked off today has rolled to a later day — it's done for now, so
-        // keep it off the to-do list until that day comes round.
-        OR: [{ recurring: false }, { dueDate: null }, { dueDate: { lte: userToday(user.timezone) } }],
+        // Overdue and today only — later tasks (including repeating ones already ticked off
+        // for today) show up here when their day comes.
+        ...dueByTodayWhere(userToday(user.timezone)),
       },
       orderBy: [{ dueDate: "asc" }, { order: "asc" }],
     }),
@@ -193,10 +193,10 @@ export default async function FolderPage({
               </Link>
             </header>
             <div className="border-b px-3 py-2.5">
-              <NewTaskForm compact lockSubject defaultFolderId={folder.id} />
+              <NewTaskForm compact lockSubject defaultFolderId={folder.id} defaultDueDate={new Date()} />
             </div>
             {todos.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-muted-foreground">Nothing to do for {folder.name} yet.</p>
+              <p className="px-4 py-4 text-sm text-muted-foreground">Nothing due today for {folder.name}.</p>
             ) : (
               <div className="flex max-h-80 flex-col gap-px overflow-y-auto p-1.5">
                 {todos.map((task) => (

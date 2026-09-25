@@ -1,11 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { creditActivity } from "@/lib/gamification";
+import { creditActivity, userToday } from "@/lib/gamification";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TaskPriority } from "@/generated/prisma/enums";
-import { dateOnlyStringToUTCDate, todayDateOnly } from "@/lib/date-only";
+import { dateOnlyStringToUTCDate } from "@/lib/date-only";
 import { getFolderRole, roleAtLeast } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
 
@@ -43,7 +43,7 @@ export async function createTask(input: {
       dueDate: input.dueDate
         ? dateOnlyStringToUTCDate(input.dueDate)
         : input.recurring
-          ? todayDateOnly()
+          ? userToday(user.timezone)
           : null,
       priority: input.priority ?? TaskPriority.P3,
       recurring: input.recurring ?? false,
@@ -67,7 +67,7 @@ export async function toggleTask(taskId: string, completed: boolean) {
   if (completed && task.recurring) {
     // Repeating tasks never stay done: ticking one rolls it to the day after its due date
     // (or after today, if it was overdue), ready to be done again.
-    const today = todayDateOnly();
+    const today = userToday(user.timezone);
     const base = task.dueDate && task.dueDate > today ? task.dueDate : today;
     const next = new Date(base);
     next.setUTCDate(next.getUTCDate() + 1);

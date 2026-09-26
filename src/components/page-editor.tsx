@@ -118,6 +118,7 @@ export function PageEditor({
   const { resolvedTheme } = useTheme();
   const colorScheme = resolvedTheme === "dark" ? "dark" : "light";
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const titleSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useCreateBlockNote({
@@ -177,6 +178,7 @@ export function PageEditor({
 
   return (
     <div
+      ref={containerRef}
       className={cn(
         "mx-auto flex w-full flex-1 flex-col gap-3 pt-10 pb-32",
         fullWidth ? "max-w-none md:px-6 xl:pr-16" : "max-w-[45rem]",
@@ -192,7 +194,7 @@ export function PageEditor({
           className="w-full bg-transparent text-[2.5rem] leading-[1.2] font-bold text-foreground outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-70"
         />
         <span className="shrink-0 text-xs text-muted-foreground">{statusLabel}</span>
-        <ListenPlayer pageId={pageId} getBlocks={() => editor.document} />
+        <ListenPlayer pageId={pageId} getBlocks={() => editor.document} anchorRef={containerRef} />
         <DropdownMenu>
           <DropdownMenuTrigger
             render={

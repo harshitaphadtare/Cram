@@ -55,7 +55,16 @@ function blockElement(id: string) {
  * following the section being read. Nothing is generated until the button is pressed. The next
  * section is fetched while the current one plays, so there's no gap between them.
  */
-export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks: () => unknown[] }) {
+export function ListenPlayer({
+  pageId,
+  getBlocks,
+  anchorRef,
+}: {
+  pageId: string;
+  getBlocks: () => unknown[];
+  /** The notes column — the player is centred under it rather than under the whole window. */
+  anchorRef: React.RefObject<HTMLElement | null>;
+}) {
   const [chunks, setChunks] = useState<SpeechChunk[] | null>(null);
   const [index, setIndex] = useState(0);
   const [status, setStatus] = useState<Status>("loading");
@@ -66,6 +75,7 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
   const urls = useRef(new Map<string, Promise<string>>());
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
+  const [centerX, setCenterX] = useState<number | null>(null);
 
   useEffect(() => {
     prefsRef.current = prefs;
@@ -217,6 +227,26 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
     return () => els.forEach((el) => el.classList.remove(READING_CLASS));
   }, [chunks, index, status]);
 
+  // Keep the player centred on the notes column as the sidebar opens/closes or the window resizes.
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    if (!chunks || !anchor) return;
+    const measure = () => {
+      const rect = anchor.getBoundingClientRect();
+      setCenterX(rect.left + rect.width / 2);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    // The column itself often keeps its width and only shifts, so watch its container too.
+    observer.observe(anchor);
+    if (anchor.parentElement) observer.observe(anchor.parentElement);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [chunks, anchorRef]);
+
   // Stop when leaving the page; Escape closes the player.
   useEffect(() => () => stop(), [stop]);
   useEffect(() => {
@@ -248,7 +278,8 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
           <div
             role="region"
             aria-label="Read-aloud player"
-            className="fixed bottom-5 left-1/2 z-40 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
+            style={{ left: centerX ?? "50%" }}
+            className="fixed bottom-5 z-40 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
           >
             <div className="overflow-hidden rounded-2xl border bg-popover/95 text-popover-foreground shadow-xl backdrop-blur">
               <div className="flex items-center gap-2 px-3 py-2.5">

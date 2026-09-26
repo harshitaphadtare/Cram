@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import type { Block } from "@blocknote/core";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,8 @@ export function extractHeadings(blocks: Block[]): OutlineHeading[] {
 function headingElement(id: string) {
   return document.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
 }
+
+const noopSubscribe = () => () => {};
 
 // Dash widths and list indents per nesting depth (deeper levels share the last style).
 const DASH_WIDTH = ["w-5", "w-3.5", "w-2.5"];
@@ -84,7 +87,9 @@ export function PageOutline({ headings }: { headings: OutlineHeading[] }) {
     if (closeTimer.current) clearTimeout(closeTimer.current);
   }, []);
 
-  if (headings.length < 2) return null;
+  const inBrowser = useSyncExternalStore(noopSubscribe, () => true, () => false);
+
+  if (headings.length < 2 || !inBrowser) return null;
 
   // Depth is relative to the shallowest heading, so a page that only uses H2/H3 isn't all indented.
   const minLevel = Math.min(...headings.map((h) => h.level));
@@ -102,7 +107,10 @@ export function PageOutline({ headings }: { headings: OutlineHeading[] }) {
     setActiveId(id);
   };
 
-  return (
+  // Portalled to <body>: the page transition wrapper animates with a transform, and a transformed
+  // ancestor turns `position: fixed` into "scrolls with the content" — the outline would only be
+  // visible at the top of the page.
+  return createPortal(
     <nav
       aria-label="Page outline"
       className="fixed top-32 right-4 z-20 hidden xl:block"
@@ -153,6 +161,7 @@ export function PageOutline({ headings }: { headings: OutlineHeading[] }) {
           </ul>
         </div>
       )}
-    </nav>
+    </nav>,
+    document.body,
   );
 }

@@ -1,11 +1,10 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
+import { DEFAULT_TTS_VOICE, type TtsVoice } from "@/lib/tts-voices";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 export const TTS_MODEL = "gemini-3.1-flash-tts-preview";
-/** A soft, warm prebuilt Gemini voice — the "calm tutor" read-aloud voice. */
-export const TTS_VOICE = "Sulafat";
 
 const STYLE_PROMPT =
   "Read the following study notes aloud in a calm, warm and unhurried voice, like a patient tutor. " +
@@ -31,14 +30,14 @@ function pcmToWav(pcm: Buffer, sampleRate: number, channels = 1): Buffer {
   return Buffer.concat([header, pcm]);
 }
 
-/** Speaks `text` with the calm read-aloud voice and returns a playable WAV file. */
-export async function synthesizeSpeech(text: string): Promise<Buffer> {
+/** Speaks `text` in the given voice (calm by default) and returns a playable WAV file. */
+export async function synthesizeSpeech(text: string, voice: TtsVoice = DEFAULT_TTS_VOICE): Promise<Buffer> {
   const response = await ai.models.generateContent({
     model: TTS_MODEL,
     contents: [{ role: "user", parts: [{ text: `${STYLE_PROMPT}\n\n${text}` }] }],
     config: {
       responseModalities: ["AUDIO"],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } } },
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
     },
   });
 

@@ -68,12 +68,18 @@ function TimerSettings() {
               </div>
             ))}
           </div>
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-normal">Auto-start breaks</Label>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <Label className="text-sm font-normal">Start breaks automatically</Label>
+              <p className="text-xs text-muted-foreground">When focus time is up, the break timer starts on its own.</p>
+            </div>
             <Switch checked={settings.autoStartBreaks} onCheckedChange={(v) => updateSettings({ autoStartBreaks: v })} />
           </div>
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-normal">Auto-start focus</Label>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <Label className="text-sm font-normal">Start focus automatically</Label>
+              <p className="text-xs text-muted-foreground">When a break ends, the next focus session starts on its own.</p>
+            </div>
             <Switch checked={settings.autoStartWork} onCheckedChange={(v) => updateSettings({ autoStartWork: v })} />
           </div>
           <div className="flex items-center justify-between">

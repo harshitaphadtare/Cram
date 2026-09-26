@@ -5,7 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getFolderRole, roleAtLeast } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
-import { synthesizeSpeech, TTS_MODEL, TTS_VOICE } from "@/lib/tts";
+import { synthesizeSpeech, TTS_MODEL } from "@/lib/tts";
+import { DEFAULT_TTS_VOICE, isTtsVoice } from "@/lib/tts-voices";
 
 // Generating a minute of speech can take a while.
 export const maxDuration = 60;
@@ -34,7 +35,12 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as { pageId?: unknown; text?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as {
+    pageId?: unknown;
+    text?: unknown;
+    voice?: unknown;
+  } | null;
+  const voice = isTtsVoice(body?.voice) ? body.voice : DEFAULT_TTS_VOICE;
   const pageId = typeof body?.pageId === "string" ? body.pageId : null;
   const text = typeof body?.text === "string" ? body.text.trim() : "";
   if (!pageId || !text) return NextResponse.json({ error: "Missing page or text." }, { status: 400 });
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const hash = createHash("sha256").update(`${TTS_MODEL}|${TTS_VOICE}|${text}`).digest("hex");
+  const hash = createHash("sha256").update(`${TTS_MODEL}|${voice}|${text}`).digest("hex");
   const path = `${hash}.wav`;
   const store = storage();
   const publicUrl = store.from(BUCKET).getPublicUrl(path).data.publicUrl;
@@ -56,7 +62,7 @@ export async function POST(request: Request) {
 
   let wav: Buffer;
   try {
-    wav = await synthesizeSpeech(text);
+    wav = await synthesizeSpeech(text, voice);
   } catch (err) {
     console.error("Speech synthesis failed", err);
     const busy = err instanceof Error && /429|quota|503|overloaded/i.test(err.message);

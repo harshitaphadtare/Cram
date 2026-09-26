@@ -3,49 +3,84 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Headphones, Loader2, Pause, Play, SkipBack, SkipForward, X } from "lucide-react";
+import { Check, Loader2, Pause, Play, Settings2, SkipBack, SkipForward, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { buildSpeechChunks, type SpeechChunk } from "@/lib/speech-chunks";
+import { DEFAULT_TTS_VOICE, TTS_VOICES, isTtsVoice, type TtsVoice } from "@/lib/tts-voices";
 import { cn } from "@/lib/utils";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 const READING_CLASS = "cram-reading";
+const PREFS_KEY = "cram-read-aloud";
 
 type Status = "loading" | "playing" | "paused" | "done";
+
+interface Prefs {
+  voice: TtsVoice;
+  speed: number;
+}
+
+function loadPrefs(): Prefs {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<Prefs>;
+    return {
+      voice: isTtsVoice(saved.voice) ? saved.voice : DEFAULT_TTS_VOICE,
+      speed: SPEEDS.includes(saved.speed ?? 0) ? saved.speed! : 1,
+    };
+  } catch {
+    return { voice: DEFAULT_TTS_VOICE, speed: 1 };
+  }
+}
+
+function savePrefs(prefs: Prefs) {
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Storage unavailable — preferences just won't be remembered.
+  }
+}
+
+/** Rough time Gemini needs to voice a chunk (measured ≈ 65 ms per character, plus overhead). */
+function estimatedPrepMs(text: string) {
+  return 1500 + text.length * 65;
+}
 
 function blockElement(id: string) {
   return document.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
 }
 
 /**
- * "Listen to this page": reads the notes aloud in a calm Gemini voice, section by section,
- * highlighting and following the section being read. The next section is fetched while the
- * current one plays, so there's no gap between them.
+ * "Read aloud": reads the page's notes in a calm Gemini voice, section by section, highlighting and
+ * following the section being read. Nothing is generated until the button is pressed. The next
+ * section is fetched while the current one plays, so there's no gap between them.
  */
 export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks: () => unknown[] }) {
   const [chunks, setChunks] = useState<SpeechChunk[] | null>(null);
   const [index, setIndex] = useState(0);
   const [status, setStatus] = useState<Status>("loading");
-  const [speed, setSpeed] = useState(1);
+  const [prefs, setPrefs] = useState<Prefs>({ voice: DEFAULT_TTS_VOICE, speed: 1 });
   const [fraction, setFraction] = useState(0);
+  const [prep, setPrep] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urls = useRef(new Map<number, Promise<string>>());
+  const urls = useRef(new Map<string, Promise<string>>());
   const runRef = useRef(0);
-  const speedRef = useRef(speed);
+  const prefsRef = useRef(prefs);
 
   useEffect(() => {
-    speedRef.current = speed;
-    if (audioRef.current) audioRef.current.playbackRate = speed;
-  }, [speed]);
+    prefsRef.current = prefs;
+    if (audioRef.current) audioRef.current.playbackRate = prefs.speed;
+  }, [prefs]);
 
   const clipUrl = useCallback(
-    (list: SpeechChunk[], i: number) => {
-      let url = urls.current.get(i);
+    (list: SpeechChunk[], i: number, voice: TtsVoice) => {
+      const key = `${voice}:${i}`;
+      let url = urls.current.get(key);
       if (!url) {
         url = fetch("/api/speech", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pageId, text: list[i].text }),
+          body: JSON.stringify({ pageId, text: list[i].text, voice }),
         }).then(async (res) => {
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
@@ -58,8 +93,8 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
           return ((await res.json()) as { url: string }).url;
         });
         // A failed clip shouldn't stay cached — allow a retry.
-        url.catch(() => urls.current.delete(i));
-        urls.current.set(i, url);
+        url.catch(() => urls.current.delete(key));
+        urls.current.set(key, url);
       }
       return url;
     },
@@ -71,18 +106,19 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
       const run = ++runRef.current;
       const audio = audioRef.current;
       if (!audio) return;
+      const { voice } = prefsRef.current;
       audio.pause();
       setIndex(i);
       setFraction(0);
       setStatus("loading");
       try {
-        const url = await clipUrl(list, i);
+        const url = await clipUrl(list, i, voice);
         if (run !== runRef.current) return; // skipped elsewhere meanwhile
         audio.src = url;
-        audio.playbackRate = speedRef.current;
+        audio.playbackRate = prefsRef.current.speed;
         await audio.play();
         setStatus("playing");
-        if (i + 1 < list.length) void clipUrl(list, i + 1).catch(() => {});
+        if (i + 1 < list.length) void clipUrl(list, i + 1, voice).catch(() => {});
       } catch (err) {
         if (run !== runRef.current) return;
         setStatus("paused");
@@ -98,7 +134,9 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
       toast.info("There's nothing to read on this page yet.");
       return;
     }
-    urls.current.clear();
+    const loaded = loadPrefs();
+    prefsRef.current = loaded;
+    setPrefs(loaded);
     audioRef.current ??= new Audio();
     setChunks(list);
     void playChunk(list, 0);
@@ -109,6 +147,15 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
     audioRef.current?.pause();
     setChunks(null);
   }, []);
+
+  function updatePrefs(patch: Partial<Prefs>) {
+    const next = { ...prefsRef.current, ...patch };
+    prefsRef.current = next;
+    setPrefs(next);
+    savePrefs(next);
+    // A new voice means new audio: replay the current section in it.
+    if (patch.voice && chunks && status !== "done") void playChunk(chunks, index);
+  }
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -125,6 +172,21 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
       }
     }
   }
+
+  // "Preparing audio" progress: an estimate from the section's length that eases towards 95% —
+  // enough to show the request is being worked on without pretending to know exactly.
+  useEffect(() => {
+    if (!chunks || status !== "loading") return;
+    const started = Date.now();
+    const expected = estimatedPrepMs(chunks[index].text);
+    const tick = () => setPrep(0.95 * (1 - Math.exp((-2.2 * (Date.now() - started)) / expected)));
+    tick();
+    const timer = setInterval(tick, 150);
+    return () => {
+      clearInterval(timer);
+      setPrep(0);
+    };
+  }, [chunks, index, status]);
 
   // Audio element events: progress within a clip, and moving on when it finishes.
   useEffect(() => {
@@ -166,19 +228,19 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
     return () => window.removeEventListener("keydown", onKey);
   }, [chunks, stop]);
 
+  const loading = status === "loading";
   const overall = chunks ? Math.min(1, (index + fraction) / chunks.length) : 0;
 
   return (
     <>
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         onClick={chunks ? stop : start}
-        className={cn("shrink-0 gap-1.5 text-muted-foreground", chunks && "text-primary")}
-        aria-label={chunks ? "Stop listening" : "Listen to this page"}
+        className={cn("shrink-0 gap-1.5", chunks ? "text-primary" : "text-muted-foreground")}
       >
-        <Headphones />
-        {chunks ? "Listening" : "Listen"}
+        <Volume2 />
+        {chunks ? "Stop reading" : "Read aloud"}
       </Button>
 
       {chunks &&
@@ -205,9 +267,9 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
                     className="rounded-full"
                     aria-label={status === "playing" ? "Pause" : "Play"}
                     onClick={togglePlay}
-                    disabled={status === "loading"}
+                    disabled={loading}
                   >
-                    {status === "loading" ? (
+                    {loading ? (
                       <Loader2 className="animate-spin" />
                     ) : status === "playing" ? (
                       <Pause />
@@ -230,28 +292,27 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
                   <span className="truncate text-sm font-medium">
                     {status === "done" ? "Finished" : chunks[index].text.split("\n")[0].replace(/\.$/, "")}
                   </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {status === "loading" ? "Preparing audio…" : `Section ${index + 1} of ${chunks.length}`}
+                  <span className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                    {loading
+                      ? `Preparing audio… ${Math.round(prep * 100)}%`
+                      : `Section ${index + 1} of ${chunks.length} · ${prefs.speed}×`}
                   </span>
                 </div>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-12 shrink-0 text-xs tabular-nums"
-                  aria-label="Playback speed"
-                  onClick={() => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])}
-                >
-                  {speed}×
-                </Button>
+                <ReadAloudSettings prefs={prefs} onChange={updatePrefs} />
                 <Button variant="ghost" size="icon-sm" aria-label="Close player" onClick={stop}>
                   <X />
                 </Button>
               </div>
+
+              {/* While preparing: how far along the audio is. While playing: how far through the page. */}
               <div className="h-1 bg-muted">
                 <div
-                  className="h-full bg-primary transition-[width] duration-300 ease-linear"
-                  style={{ width: `${overall * 100}%` }}
+                  className={cn(
+                    "h-full transition-[width] ease-linear",
+                    loading ? "animate-pulse bg-primary/60 duration-150" : "bg-primary duration-300",
+                  )}
+                  style={{ width: `${(loading ? prep : overall) * 100}%` }}
                 />
               </div>
             </div>
@@ -259,5 +320,67 @@ export function ListenPlayer({ pageId, getBlocks }: { pageId: string; getBlocks:
           document.body,
         )}
     </>
+  );
+}
+
+function ReadAloudSettings({ prefs, onChange }: { prefs: Prefs; onChange: (patch: Partial<Prefs>) => void }) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Read-aloud settings">
+            <Settings2 />
+          </Button>
+        }
+      />
+      <PopoverContent side="top" align="end" className="w-72 p-3">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Speed</p>
+            <div className="grid grid-cols-6 gap-1 rounded-lg bg-muted p-1">
+              {SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onChange({ speed: s })}
+                  className={cn(
+                    "rounded-md py-1 text-xs tabular-nums transition-colors",
+                    prefs.speed === s
+                      ? "bg-background font-medium text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {s}×
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Voice</p>
+            <div className="flex flex-col gap-0.5">
+              {TTS_VOICES.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onChange({ voice: v.id })}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent",
+                    prefs.voice === v.id && "bg-accent",
+                  )}
+                >
+                  <span className="flex-1">
+                    {v.label}
+                    <span className="ml-1.5 text-xs text-muted-foreground">{v.description}</span>
+                  </span>
+                  {prefs.voice === v.id && <Check className="size-4 text-primary" />}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">A new voice starts from the current section.</p>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

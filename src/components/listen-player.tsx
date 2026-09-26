@@ -3,7 +3,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Check, Loader2, Pause, Play, Settings2, SkipBack, SkipForward, Volume2, X } from "lucide-react";
+import {
+  Check,
+  GripVertical,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  RotateCcw,
+  RotateCw,
+  Settings2,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { buildSpeechChunks, type SpeechChunk } from "@/lib/speech-chunks";
@@ -11,7 +26,10 @@ import { DEFAULT_TTS_VOICE, TTS_VOICES, isTtsVoice, type TtsVoice } from "@/lib/
 import { cn } from "@/lib/utils";
 
 const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
-const READING_CLASS = "cram-reading";
+const READING_STYLE =
+  "border-radius: 6px; background: color-mix(in oklab, var(--primary) 10%, transparent); " +
+  "box-shadow: -8px 0 0 color-mix(in oklab, var(--primary) 10%, transparent), " +
+  "8px 0 0 color-mix(in oklab, var(--primary) 10%, transparent);";
 const PREFS_KEY = "cram-read-aloud";
 
 type Status = "loading" | "playing" | "paused" | "done";
@@ -76,6 +94,10 @@ export function ListenPlayer({
   const runRef = useRef(0);
   const prefsRef = useRef(prefs);
   const [centerX, setCenterX] = useState<number | null>(null);
+  const [minimized, setMinimized] = useState(false);
+  /** Where the player was dragged to (top-left, px); null = default spot centred under the notes. */
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     prefsRef.current = prefs;
@@ -156,6 +178,8 @@ export function ListenPlayer({
     runRef.current++;
     audioRef.current?.pause();
     setChunks(null);
+    setMinimized(false);
+    setPos(null);
   }, []);
 
   function updatePrefs(patch: Partial<Prefs>) {
@@ -218,14 +242,80 @@ export function ListenPlayer({
     };
   }, [chunks, index, playChunk]);
 
-  // Highlight the section being read and keep it in view.
+  // Highlight the section being read. Done with an injected stylesheet keyed by block id rather
+  // than classes on the blocks: the editor re-renders its DOM and would wipe added classes.
   useEffect(() => {
     if (!chunks || status === "done") return;
-    const els = chunks[index].blockIds.map(blockElement).filter((el): el is HTMLElement => !!el);
-    els.forEach((el) => el.classList.add(READING_CLASS));
-    els[0]?.scrollIntoView({ behavior: "smooth", block: "center" });
-    return () => els.forEach((el) => el.classList.remove(READING_CLASS));
+    const style = document.createElement("style");
+    style.textContent =
+      chunks[index].blockIds
+        .map((id) => {
+          const sel = `[data-id="${CSS.escape(id)}"]`;
+          // Whichever wrapper carries the id, target the block's own text (not nested children).
+          return `${sel} > .bn-block-content, ${sel} > .bn-block > .bn-block-content`;
+        })
+        .join(",\n") + ` { ${READING_STYLE} }`;
+    document.head.appendChild(style);
+    return () => style.remove();
   }, [chunks, index, status]);
+
+  // Follow along: bring each new section into view (only when the section changes).
+  useEffect(() => {
+    if (!chunks) return;
+    blockElement(chunks[index].blockIds[0])?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [chunks, index]);
+
+  function seekBy(seconds: number) {
+    const audio = audioRef.current;
+    if (!chunks || !audio || !audio.duration) return;
+    const target = audio.currentTime + seconds;
+    if (target >= audio.duration && index + 1 < chunks.length) return void playChunk(chunks, index + 1);
+    audio.currentTime = Math.min(Math.max(0, target), audio.duration);
+    setFraction(audio.currentTime / audio.duration);
+  }
+
+  // Dragging: the player can be moved anywhere in the window (kept fully on screen).
+  function startDrag(e: React.PointerEvent<HTMLElement>) {
+    const panel = panelRef.current;
+    if (!panel || e.button !== 0) return;
+    e.preventDefault();
+    const rect = panel.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+    const move = (ev: PointerEvent) => {
+      const pad = 8;
+      setPos({
+        x: Math.min(Math.max(pad, ev.clientX - offsetX), window.innerWidth - rect.width - pad),
+        y: Math.min(Math.max(pad, ev.clientY - offsetY), window.innerHeight - rect.height - pad),
+      });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      document.body.style.userSelect = "";
+    };
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  // Keep a moved player on screen when the window shrinks or it expands from minimized.
+  useEffect(() => {
+    if (!pos) return;
+    const clamp = () => {
+      const rect = panelRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = Math.max(8, Math.min(pos.x, window.innerWidth - rect.width - 8));
+      const y = Math.max(8, Math.min(pos.y, window.innerHeight - rect.height - 8));
+      if (x !== pos.x || y !== pos.y) setPos({ x, y });
+    };
+    const frame = requestAnimationFrame(clamp);
+    window.addEventListener("resize", clamp);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", clamp);
+    };
+  }, [pos, minimized]);
 
   // Keep the player centred on the notes column as the sidebar opens/closes or the window resizes.
   useEffect(() => {
@@ -260,6 +350,50 @@ export function ListenPlayer({
 
   const loading = status === "loading";
   const overall = chunks ? Math.min(1, (index + fraction) / chunks.length) : 0;
+  const progress = loading ? prep : overall;
+
+  const playButton = chunks && (
+    <Button
+      size={minimized ? "icon-sm" : "icon"}
+      className="rounded-full"
+      aria-label={status === "playing" ? "Pause" : "Play"}
+      onClick={togglePlay}
+      disabled={loading}
+    >
+      {loading ? (
+        <Loader2 className="animate-spin" />
+      ) : status === "playing" ? (
+        <Pause />
+      ) : (
+        <Play className="translate-x-px" />
+      )}
+    </Button>
+  );
+
+  const transport = (size: "icon-sm" | "icon-xs") => (
+    <>
+      <Button variant="ghost" size={size} aria-label="Back 5 seconds" disabled={loading} onClick={() => seekBy(-5)}>
+        <SeekIcon direction="back" />
+      </Button>
+      {playButton}
+      <Button variant="ghost" size={size} aria-label="Forward 5 seconds" disabled={loading} onClick={() => seekBy(5)}>
+        <SeekIcon direction="forward" />
+      </Button>
+    </>
+  );
+
+  const dragHandle = (
+    <button
+      type="button"
+      aria-label="Move player (double-click to reset)"
+      title="Drag to move · double-click to reset"
+      onPointerDown={startDrag}
+      onDoubleClick={() => setPos(null)}
+      className="flex h-8 w-4 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground/60 hover:text-foreground active:cursor-grabbing"
+    >
+      <GripVertical className="size-4" />
+    </button>
+  );
 
   return (
     <>
@@ -276,81 +410,110 @@ export function ListenPlayer({
       {chunks &&
         createPortal(
           <div
+            ref={panelRef}
             role="region"
             aria-label="Read-aloud player"
-            style={{ left: centerX ?? "50%" }}
-            className="fixed bottom-5 z-40 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
+            style={pos ? { left: pos.x, top: pos.y } : { left: centerX ?? "50%" }}
+            className={cn(
+              "fixed z-40 animate-in fade-in-0 duration-200",
+              !pos && "bottom-5 -translate-x-1/2 slide-in-from-bottom-2",
+              !minimized && "w-[min(36rem,calc(100vw-2rem))]",
+            )}
           >
-            <div className="overflow-hidden rounded-2xl border bg-popover/95 text-popover-foreground shadow-xl backdrop-blur">
-              <div className="flex items-center gap-2 px-3 py-2.5">
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Previous section"
-                    disabled={index === 0}
-                    onClick={() => void playChunk(chunks, index - 1)}
-                  >
-                    <SkipBack />
-                  </Button>
-                  <Button
-                    size="icon"
-                    className="rounded-full"
-                    aria-label={status === "playing" ? "Pause" : "Play"}
-                    onClick={togglePlay}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <Loader2 className="animate-spin" />
-                    ) : status === "playing" ? (
-                      <Pause />
-                    ) : (
-                      <Play className="translate-x-px" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Next section"
-                    disabled={index >= chunks.length - 1}
-                    onClick={() => void playChunk(chunks, index + 1)}
-                  >
-                    <SkipForward />
-                  </Button>
-                </div>
-
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-1">
-                  <span className="truncate text-sm font-medium">
-                    {status === "done" ? "Finished" : chunks[index].text.split("\n")[0].replace(/\.$/, "")}
-                  </span>
-                  <span className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
-                    {loading
-                      ? `Preparing audio… ${Math.round(prep * 100)}%`
-                      : `Section ${index + 1} of ${chunks.length} · ${prefs.speed}×`}
-                  </span>
-                </div>
-
-                <ReadAloudSettings prefs={prefs} onChange={updatePrefs} />
-                <Button variant="ghost" size="icon-sm" aria-label="Close player" onClick={stop}>
+            {minimized ? (
+              <div className="relative flex items-center gap-0.5 overflow-hidden rounded-full border bg-popover/95 py-1 pr-1 pl-1 text-popover-foreground shadow-xl backdrop-blur">
+                {dragHandle}
+                {transport("icon-xs")}
+                <span className="min-w-9 px-1 text-center text-xs text-muted-foreground tabular-nums">
+                  {loading ? `${Math.round(prep * 100)}%` : `${index + 1}/${chunks.length}`}
+                </span>
+                <Button variant="ghost" size="icon-xs" aria-label="Expand player" onClick={() => setMinimized(false)}>
+                  <Maximize2 />
+                </Button>
+                <Button variant="ghost" size="icon-xs" aria-label="Close player" onClick={stop}>
                   <X />
                 </Button>
+                {/* Progress along the bottom edge of the pill. */}
+                <div aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 bg-muted">
+                  <div
+                    className={cn("h-full bg-primary transition-[width] duration-300", loading && "animate-pulse")}
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                </div>
               </div>
+            ) : (
+              <div className="overflow-hidden rounded-2xl border bg-popover/95 text-popover-foreground shadow-xl backdrop-blur">
+                <div className="flex items-center gap-1.5 py-2.5 pr-2 pl-1.5">
+                  {dragHandle}
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Previous section"
+                      disabled={index === 0}
+                      onClick={() => void playChunk(chunks, index - 1)}
+                    >
+                      <SkipBack />
+                    </Button>
+                    {transport("icon-sm")}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Next section"
+                      disabled={index >= chunks.length - 1}
+                      onClick={() => void playChunk(chunks, index + 1)}
+                    >
+                      <SkipForward />
+                    </Button>
+                  </div>
 
-              {/* While preparing: how far along the audio is. While playing: how far through the page. */}
-              <div className="h-1 bg-muted">
-                <div
-                  className={cn(
-                    "h-full transition-[width] ease-linear",
-                    loading ? "animate-pulse bg-primary/60 duration-150" : "bg-primary duration-300",
-                  )}
-                  style={{ width: `${(loading ? prep : overall) * 100}%` }}
-                />
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-1">
+                    <span className="truncate text-sm font-medium">
+                      {status === "done" ? "Finished" : chunks[index].text.split("\n")[0].replace(/\.$/, "")}
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                      {loading
+                        ? `Preparing audio… ${Math.round(prep * 100)}%`
+                        : `Section ${index + 1} of ${chunks.length} · ${prefs.speed}×`}
+                    </span>
+                  </div>
+
+                  <ReadAloudSettings prefs={prefs} onChange={updatePrefs} />
+                  <Button variant="ghost" size="icon-sm" aria-label="Minimize player" onClick={() => setMinimized(true)}>
+                    <Minimize2 />
+                  </Button>
+                  <Button variant="ghost" size="icon-sm" aria-label="Close player" onClick={stop}>
+                    <X />
+                  </Button>
+                </div>
+
+                {/* While preparing: how far along the audio is. While playing: how far through the page. */}
+                <div className="h-1 bg-muted">
+                  <div
+                    className={cn(
+                      "h-full transition-[width] ease-linear",
+                      loading ? "animate-pulse bg-primary/60 duration-150" : "bg-primary duration-300",
+                    )}
+                    style={{ width: `${progress * 100}%` }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>,
           document.body,
         )}
     </>
+  );
+}
+
+/** ⟲ / ⟳ with a small "5" inside, like podcast players. */
+function SeekIcon({ direction }: { direction: "back" | "forward" }) {
+  const Icon = direction === "back" ? RotateCcw : RotateCw;
+  return (
+    <span className="relative flex items-center justify-center">
+      <Icon className="size-[18px]" strokeWidth={1.75} />
+      <span className="absolute pt-px text-[7px] leading-none font-bold">5</span>
+    </span>
   );
 }
 

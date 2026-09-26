@@ -43,6 +43,34 @@ export const MODE_LABEL: Record<Mode, string> = {
 };
 
 const STORAGE_KEY = "cram-pomodoro-settings";
+const TIMER_KEY = "cram-pomodoro-timer";
+/** A session that ended longer ago than this while the app was closed is dropped, not logged. */
+const STALE_AFTER_MS = 60 * 60 * 1000;
+
+/** What survives a reload. A running timer is stored as its end time, so the countdown picks up
+ * exactly where the clock says it should be, however long the page was gone. */
+interface SavedTimer {
+  mode: Mode;
+  isRunning: boolean;
+  isActive: boolean;
+  /** Epoch ms the running session ends at. */
+  endTime: number | null;
+  /** Remaining seconds while paused. */
+  secondsLeft: number;
+  taskId?: string;
+}
+
+function loadTimer(): SavedTimer | null {
+  try {
+    const raw = window.localStorage.getItem(TIMER_KEY);
+    if (!raw) return null;
+    const t = JSON.parse(raw) as SavedTimer;
+    if (!["WORK", "SHORT_BREAK", "LONG_BREAK"].includes(t.mode)) return null;
+    return t;
+  } catch {
+    return null;
+  }
+}
 
 function loadSettings(): PomodoroSettings {
   try {
@@ -103,6 +131,7 @@ export function PomodoroProvider({
   const [taskId, setTaskId] = useState<string | undefined>(undefined);
   const endTimeRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restoredRef = useRef(false);
 
   useEffect(() => {
     const loaded = loadSettings();
@@ -110,8 +139,49 @@ export function PomodoroProvider({
     // so this can't be a lazy initializer without causing a hydration mismatch.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSettings(loaded);
-    setSecondsLeft(durationFor("WORK", loaded));
+
+    const saved = loadTimer();
+    const now = Date.now();
+    if (saved?.isRunning && saved.endTime && now - saved.endTime < STALE_AFTER_MS) {
+      // Still running (or finished moments ago — the tick below completes and logs it).
+      endTimeRef.current = saved.endTime;
+      setMode(saved.mode);
+      setSecondsLeft(Math.max(0, Math.round((saved.endTime - now) / 1000)));
+      setIsRunning(true);
+      setIsActive(true);
+      setTaskId(saved.taskId);
+    } else if (saved && !saved.isRunning && saved.isActive) {
+      // Paused mid-session.
+      setMode(saved.mode);
+      setSecondsLeft(Math.min(saved.secondsLeft, durationFor(saved.mode, loaded)));
+      setIsActive(true);
+      setTaskId(saved.taskId);
+    } else {
+      setMode(saved?.mode ?? "WORK");
+      setSecondsLeft(durationFor(saved?.mode ?? "WORK", loaded));
+      setTaskId(saved?.taskId);
+    }
+    restoredRef.current = true;
   }, []);
+
+  // Persist on every state change (not every tick: a running timer is saved as its end time).
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    const saved: SavedTimer = {
+      mode,
+      isRunning,
+      isActive,
+      endTime: isRunning ? endTimeRef.current : null,
+      secondsLeft: isRunning ? 0 : secondsLeft,
+      taskId,
+    };
+    try {
+      window.localStorage.setItem(TIMER_KEY, JSON.stringify(saved));
+    } catch {
+      // Storage unavailable — the timer just won't survive a reload.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, isRunning, isActive, taskId, isRunning ? null : secondsLeft]);
 
   const goToMode = useCallback(
     (m: Mode, autoStart: boolean) => {

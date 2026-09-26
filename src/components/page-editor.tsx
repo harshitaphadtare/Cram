@@ -24,6 +24,7 @@ import { updatePageContent, renamePage, updatePageLayout } from "@/app/actions/p
 import { toast } from "sonner";
 import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
+import { ListenPlayer } from "@/components/listen-player";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -191,6 +192,7 @@ export function PageEditor({
           className="w-full bg-transparent text-[2.5rem] leading-[1.2] font-bold text-foreground outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-70"
         />
         <span className="shrink-0 text-xs text-muted-foreground">{statusLabel}</span>
+        <ListenPlayer pageId={pageId} getBlocks={() => editor.document} />
         <DropdownMenu>
           <DropdownMenuTrigger
             render={

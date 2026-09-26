@@ -346,3 +346,12 @@
     font-size: 16px !important;
   }
 }
+
+/* Read-aloud: the section currently being spoken. */
+.cram-reading {
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--primary) 9%, transparent);
+  box-shadow: -8px 0 0 color-mix(in oklab, var(--primary) 9%, transparent),
+    8px 0 0 color-mix(in oklab, var(--primary) 9%, transparent);
+  transition: background-color 300ms ease;
+}

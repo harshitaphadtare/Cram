@@ -10,7 +10,15 @@ import {
 import { useTheme } from "next-themes";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
-import { BlockNoteSchema, combineByGroup, filterSuggestionItems, type Block } from "@blocknote/core";
+import {
+  BlockNoteSchema,
+  combineByGroup,
+  createCodeBlockSpec,
+  defaultBlockSpecs,
+  filterSuggestionItems,
+  type Block,
+} from "@blocknote/core";
+import { codeBlockOptions, syntaxHighlighter } from "@blocknote/code-block";
 import * as coreLocales from "@blocknote/core/locales";
 import {
   getMultiColumnSlashMenuItems,
@@ -25,6 +33,7 @@ import { toast } from "sonner";
 import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import { ListenPlayer } from "@/components/listen-player";
+import { withMermaidPreview } from "@/lib/mermaid-preview";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,8 +46,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// Code blocks get a language picker and syntax highlighting; Mermaid blocks show their diagram
+// (Notion-style), with the source editable when the block is selected.
+const codeBlock = withMermaidPreview(
+  createCodeBlockSpec({
+    ...codeBlockOptions,
+    supportedLanguages: {
+      ...codeBlockOptions.supportedLanguages,
+      mermaid: { name: "Mermaid", aliases: ["mmd"] },
+    },
+  }),
+);
+
 // Default blocks plus Notion-style columns (type "/columns", or drag a block to another's side).
-const schema = withMultiColumn(BlockNoteSchema.create());
+const schema = withMultiColumn(
+  BlockNoteSchema.create({ blockSpecs: { ...defaultBlockSpecs, codeBlock } }),
+);
 
 // Points at our own CSS custom properties (see globals.css) instead of hardcoded colors, so the
 // editor follows the app's palette and light/dark theme automatically — no JS theme switching needed.
@@ -130,6 +153,7 @@ export function PageEditor({
         ? (initialContent as unknown as (typeof schema.PartialBlock)[])
         : undefined,
     uploadFile: uploadImage,
+    extensions: [syntaxHighlighter],
   });
 
   const [headings, setHeadings] = useState(() => extractHeadings(editor.document as unknown as Block[]));

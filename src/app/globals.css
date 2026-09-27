@@ -206,6 +206,11 @@
 .bn-editor b {
   font-weight: 600;
 }
+/* Selected text keeps its own colour (only the background is tinted), so a text colour picked from
+ * the toolbar shows immediately instead of hiding under the browser's white-on-blue selection. */
+.bn-editor ::selection {
+  background-color: color-mix(in oklab, var(--primary) 32%, transparent);
+}
 
 /* Headings: size via BlockNote's own --level / --prev-level variables. */
 .bn-editor [data-content-type="heading"] {

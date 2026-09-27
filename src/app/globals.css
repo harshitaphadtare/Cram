@@ -346,3 +346,100 @@
     font-size: 16px !important;
   }
 }
+
+/* Mermaid code blocks rendered as diagrams (see lib/mermaid-preview.ts). */
+.cram-mermaid-block {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+/* The wrapper holds BlockNote's code block (dark, with the language picker) and, below it, the
+   diagram. Diagram-only mode hides the code block entirely. */
+.cram-mermaid-block.is-collapsed > .bn-block-content {
+  display: none;
+}
+.cram-mermaid-preview {
+  position: relative;
+  user-select: none;
+  /* Code blocks are dark in both themes; the diagram sits on the page's own background with a
+     quiet outline, so the light/dark Mermaid theme always matches what's around it. */
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.cram-mermaid-block:not(.is-collapsed) .cram-mermaid-preview {
+  margin-top: 0.5rem;
+}
+.cram-mermaid-toggle {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+  border-radius: 6px;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  opacity: 0;
+  transition: opacity 150ms;
+  cursor: pointer;
+}
+.cram-mermaid-block:hover .cram-mermaid-toggle,
+.cram-mermaid-block:not(.is-collapsed) .cram-mermaid-toggle,
+.cram-mermaid-toggle:focus-visible {
+  opacity: 1;
+}
+.cram-mermaid-toggle:hover {
+  color: var(--foreground);
+}
+.cram-mermaid {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 1.25rem 0.5rem 0.75rem;
+}
+.cram-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+.cram-mermaid-hint {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+.cram-mermaid:has(.cram-mermaid-error-title) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+.cram-mermaid-error-title {
+  color: var(--destructive);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.cram-mermaid-error {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+}
+
+/* Code block language picker: a small Notion-style label, shown when hovering the block.
+   (Also covers Mermaid blocks, whose wrapper sits between the block and BlockNote's own select.) */
+.bn-container .bn-block-content[data-content-type="codeBlock"] select {
+  opacity: 0;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  background: transparent;
+  transition: opacity 150ms, background-color 150ms;
+}
+.bn-container .bn-block-content[data-content-type="codeBlock"]:hover select,
+.bn-container .bn-block-content[data-content-type="codeBlock"] select:focus {
+  opacity: 1;
+}
+.bn-container .bn-block-content[data-content-type="codeBlock"] select:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}

@@ -1,11 +1,8 @@
-import { createCodeBlockSpec } from "@blocknote/core";
-
 /**
  * Notion-style Mermaid code blocks: the block shows the rendered diagram, with a toggle to show
  * the editable source. The diagram re-renders as the source is edited.
  *
- * BlockNote 0.55 declares a `createPreview` option for code blocks in its types but doesn't
- * implement it, so this wraps the code block's own render instead.
+ * Wired into code blocks by lib/code-block.ts.
  *
  * Mermaid is ~1 MB, so it's only loaded the first time a page actually contains a diagram.
  */
@@ -112,87 +109,68 @@ function blockText(content: unknown): string {
   return content.map((c) => (typeof c?.text === "string" ? c.text : "")).join("");
 }
 
-type CodeBlockSpec = ReturnType<typeof createCodeBlockSpec>;
+/**
+ * Wraps a rendered Mermaid code block (`blockDom`, whose editable code is `source`) so it shows
+ * the diagram, with a Show code / Hide code toggle.
+ */
+export function attachMermaidPreview(
+  block: { id: string; content?: unknown },
+  blockDom: HTMLElement | DocumentFragment,
+  source: HTMLElement,
+) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "cram-mermaid-block";
+  wrapper.append(blockDom);
 
-/** Adds diagram previews for `language === "mermaid"` to a code block spec. */
-export function withMermaidPreview(spec: CodeBlockSpec): CodeBlockSpec {
-  const baseRender = spec.implementation.render;
+  // Everything below is UI around the editable source, not document content.
+  const preview = document.createElement("div");
+  preview.className = "cram-mermaid-preview";
+  preview.contentEditable = "false";
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "cram-mermaid-toggle";
+  const diagram = document.createElement("div");
+  diagram.className = "cram-mermaid";
+  preview.append(toggle, diagram);
+  wrapper.append(preview);
+
+  // The editor fills the code element after render, so read the code from the block itself.
+  const code = blockText(block.content);
+  const id = block.id;
+
+  // Diagram only by default; code shown for empty blocks. The choice sticks across re-renders.
+  const applyToggle = () => {
+    const showCode = codeShown.get(id) ?? !code.trim();
+    wrapper.classList.toggle("is-collapsed", !showCode);
+    toggle.textContent = showCode ? "Hide code" : "Show code";
+  };
+  toggle.addEventListener("mousedown", (e) => e.preventDefault()); // keep editor focus/selection
+  toggle.addEventListener("click", () => {
+    codeShown.set(id, !(codeShown.get(id) ?? !blockText(block.content).trim()));
+    applyToggle();
+  });
+  applyToggle();
+
+  // Show the last drawing straight away (no flicker), then redraw if the code changed.
+  latestTarget.set(id, diagram);
+  const previous = lastDrawn.get(id);
+  if (previous) diagram.replaceChildren(...previous.map((n) => n.cloneNode(true)));
+  else diagram.replaceChildren(hint("Drawing diagram…"));
+  const cached = svgCache.has(`${currentTheme()}\n${code.trim()}`);
+  scheduleDraw(id, code, !previous || cached);
+
+  // Edits don't always rebuild the block, so also redraw when its code text changes.
+  const observer = new MutationObserver(() => scheduleDraw(id, source.textContent ?? "", false));
+  observer.observe(source, { characterData: true, childList: true, subtree: true });
 
   return {
-    ...spec,
-    implementation: {
-      ...spec.implementation,
-      render(block, editor) {
-        let base: ReturnType<typeof baseRender>;
-        try {
-          base = baseRender.call(this, block, editor);
-        } catch {
-          // The language picker throws for a language outside the supported list (e.g. code pasted
-          // in with an unusual language tag). Show it as plain text rather than breaking the page.
-          base = baseRender.call(this, { ...block, props: { ...block.props, language: "text" } }, editor);
-        }
-        if (block.props.language !== "mermaid" || !base.contentDOM) return base;
-
-        const wrapper = document.createElement("div");
-        wrapper.className = "cram-mermaid-block";
-        wrapper.append(base.dom);
-
-        // Everything below is UI around the editable source, not document content.
-        const preview = document.createElement("div");
-        preview.className = "cram-mermaid-preview";
-        preview.contentEditable = "false";
-
-        const toggle = document.createElement("button");
-        toggle.type = "button";
-        toggle.className = "cram-mermaid-toggle";
-        const diagram = document.createElement("div");
-        diagram.className = "cram-mermaid";
-        preview.append(toggle, diagram);
-        wrapper.append(preview);
-
-        // The editor fills the code element after render, so read the code from the block itself.
-        const code = blockText(block.content);
-        const id = block.id;
-
-        // Diagram only by default; code shown for empty blocks. The choice sticks across re-renders.
-        const applyToggle = () => {
-          const showCode = codeShown.get(id) ?? !code.trim();
-          wrapper.classList.toggle("is-collapsed", !showCode);
-          toggle.textContent = showCode ? "Hide code" : "Show code";
-        };
-        toggle.addEventListener("mousedown", (e) => e.preventDefault()); // keep editor focus/selection
-        toggle.addEventListener("click", () => {
-          codeShown.set(id, !(codeShown.get(id) ?? !blockText(block.content).trim()));
-          applyToggle();
-        });
-        applyToggle();
-
-        // Show the last drawing straight away (no flicker), then redraw if the code changed.
-        latestTarget.set(id, diagram);
-        const previous = lastDrawn.get(id);
-        if (previous) diagram.replaceChildren(...previous.map((n) => n.cloneNode(true)));
-        else diagram.replaceChildren(hint("Drawing diagram…"));
-        const cached = svgCache.has(`${currentTheme()}\n${code.trim()}`);
-        scheduleDraw(id, code, !previous || cached);
-
-        // Edits don't always rebuild the block, so also redraw when its code text changes.
-        const source = base.contentDOM;
-        const observer = new MutationObserver(() => scheduleDraw(id, source.textContent ?? "", false));
-        observer.observe(source, { characterData: true, childList: true, subtree: true });
-
-        return {
-          ...base,
-          dom: wrapper,
-          // Clicks in the diagram/toggle must not be treated as edits by the editor.
-          ignoreMutation: (m: MutationRecord | { type: "selection"; target: Node }) =>
-            preview.contains(m.target),
-          destroy: () => {
-            observer.disconnect();
-            if (latestTarget.get(id) === diagram) latestTarget.delete(id);
-            base.destroy?.();
-          },
-        };
-      },
+    dom: wrapper,
+    /** Clicks in the diagram/toggle must not be treated as edits by the editor. */
+    isOwnUi: (target: Node) => preview.contains(target),
+    destroy: () => {
+      observer.disconnect();
+      if (latestTarget.get(id) === diagram) latestTarget.delete(id);
     },
   };
 }

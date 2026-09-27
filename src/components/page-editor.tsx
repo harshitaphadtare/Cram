@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import { ListenPlayer } from "@/components/listen-player";
-import { withMermaidPreview } from "@/lib/mermaid-preview";
+import { enhanceCodeBlock } from "@/lib/code-block";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,14 +48,13 @@ import { cn } from "@/lib/utils";
 
 // Code blocks get a language picker and syntax highlighting; Mermaid blocks show their diagram
 // (Notion-style), with the source editable when the block is selected.
-const codeBlock = withMermaidPreview(
-  createCodeBlockSpec({
-    ...codeBlockOptions,
-    supportedLanguages: {
-      ...codeBlockOptions.supportedLanguages,
-      mermaid: { name: "Mermaid", aliases: ["mmd"] },
-    },
-  }),
+const codeLanguages = {
+  ...codeBlockOptions.supportedLanguages,
+  mermaid: { name: "Mermaid", aliases: ["mmd"] },
+};
+const codeBlock = enhanceCodeBlock(
+  createCodeBlockSpec({ ...codeBlockOptions, supportedLanguages: codeLanguages }),
+  codeLanguages,
 );
 
 // Default blocks plus Notion-style columns (type "/columns", or drag a block to another's side).

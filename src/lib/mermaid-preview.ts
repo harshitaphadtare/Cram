@@ -123,7 +123,14 @@ export function withMermaidPreview(spec: CodeBlockSpec): CodeBlockSpec {
     implementation: {
       ...spec.implementation,
       render(block, editor) {
-        const base = baseRender.call(this, block, editor);
+        let base: ReturnType<typeof baseRender>;
+        try {
+          base = baseRender.call(this, block, editor);
+        } catch {
+          // The language picker throws for a language outside the supported list (e.g. code pasted
+          // in with an unusual language tag). Show it as plain text rather than breaking the page.
+          base = baseRender.call(this, { ...block, props: { ...block.props, language: "text" } }, editor);
+        }
         if (block.props.language !== "mermaid" || !base.contentDOM) return base;
 
         const wrapper = document.createElement("div");

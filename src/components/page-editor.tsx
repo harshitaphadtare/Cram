@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   BlockNoteContext,
   SuggestionMenuController,
@@ -27,8 +27,9 @@ import {
   withMultiColumn,
 } from "@blocknote/xl-multi-column";
 import type { Theme } from "@blocknote/mantine";
-import { FolderInput, Link2, MoreHorizontal } from "lucide-react";
-import { updatePageContent, renamePage, updatePageLayout } from "@/app/actions/pages";
+import { FilePlus2, FolderInput, Link2, Loader2, MoreHorizontal } from "lucide-react";
+import { createPage, updatePageContent, renamePage, updatePageLayout } from "@/app/actions/pages";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
@@ -139,6 +140,20 @@ export function PageEditor({
   folder?: { id: string; name: string; pages: { id: string; title: string; parentId: string | null }[] };
 }) {
   const [moveOpen, setMoveOpen] = useState(false);
+  const [creatingSubPage, startCreatingSubPage] = useTransition();
+  const router = useRouter();
+
+  function addSubPage() {
+    if (!folder) return;
+    startCreatingSubPage(async () => {
+      try {
+        const page = await createPage(folder.id, pageId);
+        router.push(`/app/folders/${folder.id}/pages/${page.id}`);
+      } catch {
+        toast.error("Couldn't create the page.");
+      }
+    });
+  }
   const [title, setTitle] = useState(initialTitle);
   const [fullWidth, setFullWidth] = useState(initialFullWidth);
   const [smallText, setSmallText] = useState(initialSmallText);
@@ -235,6 +250,8 @@ export function PageEditor({
         smallText && "cram-small-text",
       )}
     >
+      {/* Title area; hovering it reveals "Add sub-page" beneath the title (like Notion's "Add icon"). */}
+      <div className="group/title flex flex-col gap-1">
       <div data-tour="editor" className="flex items-center justify-between gap-3">
         <input
           value={title}
@@ -296,7 +313,22 @@ export function PageEditor({
         </DropdownMenu>
       </div>
 
-      <div className="min-h-40">
+      {folder && editable && (
+        <div className="-mt-0.5 flex h-7 items-center">
+          <button
+            type="button"
+            onClick={addSubPage}
+            disabled={creatingSubPage}
+            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted-foreground opacity-0 transition-[opacity,background-color,color] group-hover/title:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-60 [@media(hover:none)]:opacity-100"
+          >
+            {creatingSubPage ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
+            Add sub-page
+          </button>
+        </div>
+      )}
+      </div>
+
+      <div className="min-h-16">
         <BlockNoteContext.Provider value={{ colorSchemePreference: colorScheme }}>
           <BlockNoteView
             editor={editor}
@@ -324,8 +356,6 @@ export function PageEditor({
       {folder && (
         <SubPages
           folderId={folder.id}
-          pageId={pageId}
-          editable={editable}
           subPages={folder.pages
             .filter((p) => p.parentId === pageId)
             .map((p) => ({ ...p, childCount: folder.pages.filter((c) => c.parentId === p.id).length }))}

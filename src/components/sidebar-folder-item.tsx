@@ -14,6 +14,8 @@ import { folderDotClass } from "@/lib/folder-colors";
 import { cn } from "@/lib/utils";
 import type { VisibleFolder } from "@/lib/data/folders";
 import { buildPageTree, pageAncestors, type PageNode } from "@/lib/page-tree";
+import { canNestInto, endPageDrag, getPageDrag, PAGE_DRAG_TYPE, startPageDrag } from "@/lib/page-drag";
+import { movePage } from "@/app/actions/pages";
 
 /**
  * A folder row that expands in place to list its pages (Notion's page tree). Hovering the row swaps
@@ -29,6 +31,7 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
   const open = toggled ?? inside;
   const [creating, startCreating] = useTransition();
   const canEdit = folder.role !== "VIEWER";
+  const [folderDrop, setFolderDrop] = useState(false);
   // Pages on the way to the one you're viewing start expanded.
   const currentPageId = pathname.startsWith(`${href}/pages/`) ? pathname.split("/")[5] : undefined;
   const openPath = new Set(currentPageId ? pageAncestors(currentPageId, folder.pages).map((p) => p.id) : []);
@@ -50,9 +53,30 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
       <SidebarMenuButton
         isActive={pathname === href}
         tooltip={folder.name}
-        className="pl-7 group-data-[collapsible=icon]:pl-2!"
+        className={cn(
+          "pl-7 group-data-[collapsible=icon]:pl-2!",
+          folderDrop && "bg-primary/15 ring-1 ring-primary/60 ring-inset",
+        )}
         render={
-          <Link href={href}>
+          <Link
+            href={href}
+            draggable={false}
+            // Dropping a sub-page on its subject moves it back to the top level.
+            onDragOver={(e) => {
+              const drag = getPageDrag();
+              if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE) || drag?.folderId !== folder.id || !drag.parentId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setFolderDrop(true);
+            }}
+            onDragLeave={() => setFolderDrop(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setFolderDrop(false);
+              const drag = getPageDrag();
+              if (drag?.folderId === folder.id && drag.parentId) dropPage(null, folder.pages);
+            }}
+          >
             <span className="truncate">{folder.name}</span>
             {folder.role !== "OWNER" && (
               <Users className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
@@ -110,6 +134,7 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
           ) : (
             <PageTreeList
               nodes={buildPageTree(folder.pages)}
+              allPages={folder.pages}
               folderId={folder.id}
               canEdit={canEdit}
               openPath={openPath}
@@ -123,38 +148,43 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
 
 type SidebarPage = VisibleFolder["pages"][number];
 
-function PageTreeList({
-  nodes,
-  folderId,
-  canEdit,
-  openPath,
-}: {
-  nodes: PageNode<SidebarPage>[];
+interface TreeProps {
+  allPages: SidebarPage[];
   folderId: string;
   canEdit: boolean;
   openPath: Set<string>;
-}) {
+}
+
+function PageTreeList({ nodes, ...rest }: TreeProps & { nodes: PageNode<SidebarPage>[] }) {
   return (
     <ul className="flex flex-col gap-px py-px">
       {nodes.map((node) => (
-        <PageTreeItem key={node.page.id} node={node} folderId={folderId} canEdit={canEdit} openPath={openPath} />
+        <PageTreeItem key={node.page.id} node={node} {...rest} />
       ))}
     </ul>
   );
 }
 
+/** Moves the page being dragged under `parentId` (null = top level of its subject). */
+function dropPage(parentId: string | null, pages: SidebarPage[]) {
+  const dragged = getPageDrag();
+  endPageDrag();
+  if (!dragged) return;
+  const titleOf = (id: string) => pages.find((p) => p.id === id)?.title || "Untitled";
+  movePage(dragged.pageId, parentId)
+    .then(() =>
+      toast.success(
+        parentId
+          ? `Moved "${titleOf(dragged.pageId)}" into "${titleOf(parentId)}"`
+          : `Moved "${titleOf(dragged.pageId)}" to the top level`,
+      ),
+    )
+    .catch((err) => toast.error(err instanceof Error ? err.message : "Couldn't move the page."));
+}
+
 /** One page in the sidebar tree: link, expand arrow when it has sub-pages, "+" for a new sub-page. */
-function PageTreeItem({
-  node,
-  folderId,
-  canEdit,
-  openPath,
-}: {
-  node: PageNode<SidebarPage>;
-  folderId: string;
-  canEdit: boolean;
-  openPath: Set<string>;
-}) {
+function PageTreeItem({ node, allPages, folderId, canEdit, openPath }: TreeProps & { node: PageNode<SidebarPage> }) {
+  const [dropTarget, setDropTarget] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { page, depth, children } = node;
@@ -181,15 +211,42 @@ function PageTreeItem({
 
   return (
     <li>
-      <div className="group/page relative">
+      {/* Drag a page onto another to put it inside (and open it so the result is visible). */}
+      <div
+        className="group/page relative"
+        draggable={canEdit}
+        onDragStart={(e) => startPageDrag(e, page, folderId, allPages)}
+        onDragEnd={() => {
+          endPageDrag();
+          setDropTarget(false);
+        }}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE) || !canNestInto(page.id, folderId)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          setDropTarget(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDropTarget(false);
+          if (!canNestInto(page.id, folderId)) return;
+          setToggled(true);
+          dropPage(page.id, allPages);
+        }}
+      >
         <Link
           href={pageHref}
+          draggable={false}
           style={{ paddingLeft: indent }}
           className={cn(
             "flex h-7 items-center gap-2 rounded-md pr-8 text-sm transition-colors",
             active
               ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
               : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            dropTarget && "bg-primary/15 ring-1 ring-primary/60 ring-inset",
           )}
         >
           <FileText className={cn("size-3.5 shrink-0 opacity-70", hasChildren && "group-hover/page:opacity-0")} />
@@ -228,7 +285,7 @@ function PageTreeItem({
       </div>
 
       {hasChildren && open && (
-        <PageTreeList nodes={children} folderId={folderId} canEdit={canEdit} openPath={openPath} />
+        <PageTreeList nodes={children} allPages={allPages} folderId={folderId} canEdit={canEdit} openPath={openPath} />
       )}
     </li>
   );

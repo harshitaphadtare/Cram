@@ -27,7 +27,7 @@ import {
   withMultiColumn,
 } from "@blocknote/xl-multi-column";
 import type { Theme } from "@blocknote/mantine";
-import { FilePlus2, FolderInput, Link2, Loader2, MoreHorizontal } from "lucide-react";
+import { FolderInput, Link2, Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { createPage, updatePageContent, renamePage, updatePageLayout } from "@/app/actions/pages";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -193,14 +193,15 @@ export function PageEditor({
         editor.pasteMarkdown(markdown);
         return true;
       }
-      // Rich text whose bullets arrived as "- item" paragraphs: make them real lists.
+      // Otherwise prefer the rich text when there is some (BlockNote's own fallback would re-read the
+      // raw plain text as Markdown, spacing quirks and all) — fixing bullets that arrived as
+      // "- item" paragraphs on the way.
       const types = event.clipboardData?.types ?? [];
-      if (!types.includes("blocknote/html") && !types.includes("Files")) {
-        const fixed = fixDashBulletsInHtml(event.clipboardData?.getData("text/html") ?? "");
-        if (fixed) {
-          editor.pasteHTML(fixed);
-          return true;
-        }
+      const html = event.clipboardData?.getData("text/html") ?? "";
+      const handledByDefault = ["blocknote/html", "Files", "vscode-editor-data"].some((t) => types.includes(t));
+      if (html && !handledByDefault) {
+        editor.pasteHTML(fixDashBulletsInHtml(html) ?? html);
+        return true;
       }
       return defaultPasteHandler();
     },
@@ -336,14 +337,14 @@ export function PageEditor({
       </div>
 
       {folder && editable && (
-        <div className="-mt-0.5 flex h-7 items-center">
+        <div className="flex items-center">
           <button
             type="button"
             onClick={addSubPage}
             disabled={creatingSubPage}
-            className="-ml-1.5 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted-foreground/80 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+            className="-ml-2 inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[0.8125rem] font-medium text-muted-foreground/75 transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:outline-none disabled:opacity-60"
           >
-            {creatingSubPage ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
+            {creatingSubPage ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
             Add sub-page
           </button>
         </div>

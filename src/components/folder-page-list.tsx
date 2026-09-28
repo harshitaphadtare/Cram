@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { CornerLeftUp, FileText } from "lucide-react";
+import { ChevronRight, CornerLeftUp, FileText } from "lucide-react";
 import { DeletePageButton } from "@/components/delete-page-button";
 import { movePage } from "@/app/actions/pages";
 import { canNestInto, endPageDrag, getPageDrag, PAGE_DRAG_TYPE, startPageDrag, usePageDrag } from "@/lib/page-drag";
@@ -40,6 +40,51 @@ export function MasteryPill({ value, due }: { value: number; due: boolean }) {
 }
 
 /**
+ * Which pages are collapsed, per subject — remembered in localStorage so a folded-up module stays
+ * folded. An external store (rather than state) so the server render and first client render
+ * agree (everything expanded) and saved state applies right after.
+ */
+const collapsedKey = (folderId: string) => `cram.collapsed-pages.${folderId}`;
+const collapseListeners = new Set<() => void>();
+const collapseCache = new Map<string, string>();
+
+function readCollapsed(folderId: string): string {
+  if (!collapseCache.has(folderId)) {
+    let raw = "[]";
+    try {
+      raw = window.localStorage.getItem(collapsedKey(folderId)) ?? "[]";
+    } catch {}
+    collapseCache.set(folderId, raw);
+  }
+  return collapseCache.get(folderId)!;
+}
+
+function writeCollapsed(folderId: string, ids: string[]) {
+  const raw = JSON.stringify(ids);
+  collapseCache.set(folderId, raw);
+  try {
+    window.localStorage.setItem(collapsedKey(folderId), raw);
+  } catch {}
+  collapseListeners.forEach((l) => l());
+}
+
+function useCollapsed(folderId: string): Set<string> {
+  const raw = useSyncExternalStore(
+    (l) => {
+      collapseListeners.add(l);
+      return () => collapseListeners.delete(l);
+    },
+    () => readCollapsed(folderId),
+    () => "[]",
+  );
+  try {
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * The subject's pages as an indented tree. Editors can drag a page onto another to nest it
  * inside, or onto "Move to top level" to take it back out.
  */
@@ -53,6 +98,22 @@ export function FolderPageList({
   canEdit: boolean;
 }) {
   const [over, setOver] = useState<string | null>(null);
+  const collapsed = useCollapsed(folderId);
+  const toggleCollapsed = (id: string) => {
+    const next = new Set(collapsed);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    writeCollapsed(folderId, [...next]);
+  };
+  // A row is hidden when any page above it is collapsed.
+  const parentOf = new Map(rows.map((r) => [r.id, r.parentId]));
+  const isHidden = (row: FolderPageRow) => {
+    for (let p = row.parentId, hops = 0; p && hops < 64; p = parentOf.get(p) ?? null, hops++) {
+      if (collapsed.has(p)) return true;
+    }
+    return false;
+  };
+  const visibleRows = rows.filter((r) => !isHidden(r));
   const [pending, startTransition] = useTransition();
   const drag = usePageDrag();
   const titleOf = (id: string) => rows.find((r) => r.id === id)?.title || "Untitled";
@@ -84,8 +145,9 @@ export function FolderPageList({
       data-tour="folder-pages"
       className={cn("flex flex-col overflow-hidden rounded-xl border bg-card", pending && "opacity-70")}
     >
-      {rows.map((row, i) => {
+      {visibleRows.map((row, i) => {
         const isTarget = over === row.id;
+        const isCollapsed = collapsed.has(row.id);
         return (
           // DeletePageButton is a sibling of the Link, not nested inside it — a <button> inside an
           // <a> is invalid HTML and browsers bubble clicks through inconsistently.
@@ -111,16 +173,29 @@ export function FolderPageList({
               if (canNestInto(row.id, folderId)) drop(row.id);
             }}
             className={cn(
-              "group flex items-center gap-3 pr-2 transition-colors hover:bg-accent",
+              "group relative flex items-center gap-3 pr-2 transition-colors hover:bg-accent",
               i > 0 && "border-t",
               drag?.pageId === row.id && "opacity-50",
               isTarget && "bg-primary/10 ring-2 ring-primary/60 ring-inset hover:bg-primary/10",
             )}
           >
+            {row.descendantCount > 0 && (
+              <button
+                type="button"
+                onClick={() => toggleCollapsed(row.id)}
+                aria-expanded={!isCollapsed}
+                aria-label={`${isCollapsed ? "Show" : "Hide"} pages inside ${row.title || "Untitled"}`}
+                title={isCollapsed ? "Show pages inside" : "Hide pages inside"}
+                style={{ left: 6 + row.depth * 22 }}
+                className="absolute top-1/2 z-10 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <ChevronRight className={cn("size-4 transition-transform duration-150", !isCollapsed && "rotate-90")} />
+              </button>
+            )}
             <Link
               href={`/app/folders/${folderId}/pages/${row.id}`}
               draggable={false}
-              style={{ paddingLeft: 16 + row.depth * 22 }}
+              style={{ paddingLeft: 34 + row.depth * 22 }}
               className="flex min-w-0 flex-1 items-center gap-3 py-3"
             >
               <FileText className="size-4 shrink-0 text-muted-foreground" />

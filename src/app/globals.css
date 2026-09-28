@@ -189,11 +189,12 @@
 .bn-editor {
   padding-inline: 0 !important;
 }
-/* Two classes so this beats BlockNote's own .bn-default-styles { font-size: 16px }, which loads
- * later with equal specificity. 1rem = the app's 14px base, so notes match the rest of the UI. */
+/* Two classes so this beats BlockNote's own .bn-default-styles, which loads later with equal
+ * specificity. In px, not rem, so notes read at Notion's 16px whatever the app's 14px UI base is. */
 .bn-container .bn-default-styles {
   font-family: var(--font-sans) !important;
-  font-size: 1rem;
+  /* Notion's reading size — pages opt into 14px with the page menu's "Small text". */
+  font-size: 16px;
   line-height: 1.5;
 }
 .bn-editor .bn-block-content {
@@ -260,7 +261,7 @@
 
 /* Page option: small text (Notion's "Small text") — shrinks the body a step; headings follow. */
 .cram-small-text .bn-container .bn-default-styles {
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 .cram-small-text .bn-editor [data-content-type="table"] {
   font-size: 0.8125rem;

@@ -17,7 +17,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { deletePage } from "@/app/actions/pages";
 
-export function DeletePageButton({ pageId, title }: { pageId: string; title: string }) {
+export function DeletePageButton({
+  pageId,
+  title,
+  subPageCount = 0,
+}: {
+  pageId: string;
+  title: string;
+  /** Pages nested inside this one — deleted along with it. */
+  subPageCount?: number;
+}) {
   const [pending, startTransition] = useTransition();
 
   function handleDelete() {
@@ -49,8 +58,9 @@ export function DeletePageButton({ pageId, title }: { pageId: string; title: str
         <AlertDialogHeader>
           <AlertDialogTitle>Delete &ldquo;{title}&rdquo;?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes the page and any quizzes generated from it. This can&apos;t
-            be undone.
+            {subPageCount > 0
+              ? `This permanently deletes the page, the ${subPageCount} ${subPageCount === 1 ? "page" : "pages"} inside it, and any quizzes generated from them. This can't be undone.`
+              : "This permanently deletes the page and any quizzes generated from it. This can't be undone."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

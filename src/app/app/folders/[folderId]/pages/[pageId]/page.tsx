@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getPageForUser } from "@/lib/data/pages";
+import { prisma } from "@/lib/prisma";
 import { roleAtLeast } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
 import { PageEditorClient } from "@/components/page-editor-client";
@@ -18,6 +19,12 @@ export default async function PageDetailPage({
 
   const { page, role } = result;
   const editable = roleAtLeast(role, FolderRole.EDITOR);
+  // The subject's page tree (no content) — for "Pages inside" and "Move to…".
+  const folderPages = await prisma.page.findMany({
+    where: { folderId },
+    select: { id: true, title: true, parentId: true },
+    orderBy: { order: "asc" },
+  });
 
   return (
     <div className="flex flex-1 flex-col">
@@ -28,6 +35,7 @@ export default async function PageDetailPage({
         editable={editable}
         initialFullWidth={page.fullWidth}
         initialSmallText={page.smallText}
+        folder={{ id: folderId, name: page.folder.name, pages: folderPages }}
       />
     </div>
   );

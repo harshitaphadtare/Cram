@@ -120,6 +120,11 @@ model Page {
   id          String   @id @default(cuid())
   folderId    String
   folder      Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  /// Notion-style nesting: a page can hold sub-pages (acting as a module/section within the
+  /// subject). Null = a top-level page of its folder. Deleting a page deletes its sub-pages.
+  parentId    String?
+  parent      Page?    @relation("PageTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Page[]   @relation("PageTree")
   title       String   @default("Untitled")
   content     Json     @default("[]") // BlockNote block JSON
   order       Int      @default(0)
@@ -137,6 +142,7 @@ model Page {
   reviews       PageReview[]
 
   @@index([folderId])
+  @@index([parentId])
   @@map("pages")
 }
 

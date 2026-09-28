@@ -21,8 +21,9 @@ import {
 } from "@/components/ui/dialog";
 import { Difficulty } from "@/generated/prisma/enums";
 import { startQuiz } from "@/app/actions/quiz";
+import { buildPageTree, flattenPageTree, pageDescendantIds } from "@/lib/page-tree";
 
-type PageOption = { id: string; title: string };
+type PageOption = { id: string; title: string; parentId?: string | null };
 type SelectionMode = "all" | "range" | "random" | "manual";
 
 const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; hint: string }[] = [
@@ -31,7 +32,13 @@ const DIFFICULTY_OPTIONS: { value: Difficulty; label: string; hint: string }[] =
   { value: Difficulty.HARD, label: "Hard", hint: "Deep, tricky questions" },
 ];
 
-export function QuizMeDialog({ folderId, pages }: { folderId: string; pages: PageOption[] }) {
+export function QuizMeDialog({ folderId, pages: pageList }: { folderId: string; pages: PageOption[] }) {
+  // Reading order — a page, then the pages inside it — so ranges follow the tree.
+  const tree = useMemo(
+    () => flattenPageTree(buildPageTree(pageList.map((p) => ({ ...p, parentId: p.parentId ?? null })))),
+    [pageList],
+  );
+  const pages = useMemo(() => tree.map((n) => n.page), [tree]);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<SelectionMode>("all");
   const [rangeStart, setRangeStart] = useState(1);
@@ -79,13 +86,15 @@ export function QuizMeDialog({ folderId, pages }: { folderId: string; pages: Pag
     }
   }
 
+  /** Ticking a page with sub-pages (a module) ticks everything inside it too. */
   function toggleManual(id: string) {
     setManualSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+      const ids = [id, ...pageDescendantIds(id, pages)];
+      const select = !next.has(id);
+      for (const pageId of ids) {
+        if (select) next.add(pageId);
+        else next.delete(pageId);
       }
       return next;
     });
@@ -196,15 +205,15 @@ export function QuizMeDialog({ folderId, pages }: { folderId: string; pages: Pag
             </RadioGroup>
 
             {mode === "manual" && (
-              <ScrollArea className="h-32 rounded-md border p-2">
+              <ScrollArea className="h-40 rounded-md border p-2">
                 <div className="flex flex-col gap-1.5">
-                  {pages.map((p) => (
-                    <label key={p.id} className="flex items-center gap-2 text-sm">
+                  {tree.map(({ page: p, depth }) => (
+                    <label key={p.id} className="flex items-center gap-2 text-sm" style={{ paddingLeft: depth * 18 }}>
                       <Checkbox
                         checked={manualSelected.has(p.id)}
                         onCheckedChange={() => toggleManual(p.id)}
                       />
-                      {p.title}
+                      <span className="truncate">{p.title || "Untitled"}</span>
                     </label>
                   ))}
                 </div>

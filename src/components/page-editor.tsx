@@ -27,12 +27,14 @@ import {
   withMultiColumn,
 } from "@blocknote/xl-multi-column";
 import type { Theme } from "@blocknote/mantine";
-import { Link2, MoreHorizontal } from "lucide-react";
+import { FolderInput, Link2, MoreHorizontal } from "lucide-react";
 import { updatePageContent, renamePage, updatePageLayout } from "@/app/actions/pages";
 import { toast } from "sonner";
 import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import { ListenPlayer } from "@/components/listen-player";
+import { SubPages } from "@/components/sub-pages";
+import { MovePageDialog } from "@/components/move-page-dialog";
 import { detectLanguageUpdates, enhanceCodeBlock } from "@/lib/code-block";
 import { shouldPasteAsMarkdown } from "@/lib/markdown-paste";
 import {
@@ -125,6 +127,7 @@ export function PageEditor({
   editable,
   initialFullWidth,
   initialSmallText,
+  folder,
 }: {
   pageId: string;
   initialTitle: string;
@@ -132,7 +135,10 @@ export function PageEditor({
   editable: boolean;
   initialFullWidth: boolean;
   initialSmallText: boolean;
+  /** The page's subject and its page tree — for "Pages inside" and "Move to…". */
+  folder?: { id: string; name: string; pages: { id: string; title: string; parentId: string | null }[] };
 }) {
+  const [moveOpen, setMoveOpen] = useState(false);
   const [title, setTitle] = useState(initialTitle);
   const [fullWidth, setFullWidth] = useState(initialFullWidth);
   const [smallText, setSmallText] = useState(initialSmallText);
@@ -271,6 +277,12 @@ export function PageEditor({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {folder && editable && (
+              <DropdownMenuItem onClick={() => setMoveOpen(true)}>
+                <FolderInput />
+                Move to…
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={() => {
                 void navigator.clipboard.writeText(window.location.href);
@@ -308,6 +320,26 @@ export function PageEditor({
           </BlockNoteView>
         </BlockNoteContext.Provider>
       </div>
+
+      {folder && (
+        <SubPages
+          folderId={folder.id}
+          pageId={pageId}
+          editable={editable}
+          subPages={folder.pages
+            .filter((p) => p.parentId === pageId)
+            .map((p) => ({ ...p, childCount: folder.pages.filter((c) => c.parentId === p.id).length }))}
+        />
+      )}
+      {folder && editable && (
+        <MovePageDialog
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
+          pageId={pageId}
+          folderName={folder.name}
+          pages={folder.pages}
+        />
+      )}
 
       <PageOutline headings={headings} />
     </div>

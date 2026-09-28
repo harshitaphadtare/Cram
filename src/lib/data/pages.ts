@@ -10,7 +10,7 @@ export async function getFolderForUser(folderId: string, userId: string) {
     where: { id: folderId },
     include: {
       pages: {
-        select: { id: true, title: true, order: true, updatedAt: true, createdAt: true },
+        select: { id: true, title: true, parentId: true, order: true, updatedAt: true, createdAt: true },
         orderBy: { order: "asc" },
       },
       members: { include: { user: true }, orderBy: { createdAt: "asc" } },

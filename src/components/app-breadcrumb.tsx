@@ -6,12 +6,13 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { CalendarCheck2, FileText, History, House, Settings, Timer, Trophy } from "lucide-react";
 import { folderDotClass } from "@/lib/folder-colors";
 import { cn } from "@/lib/utils";
+import { pageAncestors } from "@/lib/page-tree";
 
 export type BreadcrumbFolder = {
   id: string;
   name: string;
   color: string;
-  pages: { id: string; title: string }[];
+  pages: { id: string; title: string; parentId: string | null }[];
 };
 
 interface MenuItem {
@@ -81,17 +82,22 @@ function buildCrumbs(pathname: string, folders: BreadcrumbFolder[]): Crumb[] {
     const pageId = segments[2] === "pages" ? segments[3] : undefined;
     const page = pageId ? folder.pages.find((p) => p.id === pageId) : undefined;
     if (page) {
-      crumbs.push({
-        href: `/app/folders/${folder.id}/pages/${page.id}`,
-        label: page.title || "Untitled",
-        icon: <FileText className="size-3.5" />,
-        menu: folder.pages.map((p) => ({
+      // One crumb per level of nesting; each crumb's menu lists that level's sibling pages.
+      for (const p of [...pageAncestors(page.id, folder.pages), page]) {
+        crumbs.push({
           href: `/app/folders/${folder.id}/pages/${p.id}`,
           label: p.title || "Untitled",
           icon: <FileText className="size-3.5" />,
-          active: p.id === page.id,
-        })),
-      });
+          menu: folder.pages
+            .filter((sibling) => sibling.parentId === p.parentId)
+            .map((sibling) => ({
+              href: `/app/folders/${folder.id}/pages/${sibling.id}`,
+              label: sibling.title || "Untitled",
+              icon: <FileText className="size-3.5" />,
+              active: sibling.id === p.id,
+            })),
+        });
+      }
     }
     return crumbs;
   }
@@ -188,13 +194,26 @@ function CrumbLink({ crumb, current }: { crumb: Crumb; current: boolean }) {
 export function AppBreadcrumb({ folders }: { folders: BreadcrumbFolder[] }) {
   const pathname = usePathname();
   const crumbs = buildCrumbs(pathname, folders);
+  // Deeply nested pages: keep Home, the subject and the last two levels; the rest fold into "…"
+  // (the folded levels are still reachable from the parent crumb's menu and the sidebar).
+  const folded = crumbs.length > 5;
+  const shown = folded ? [...crumbs.slice(0, 2), null, ...crumbs.slice(-2)] : crumbs;
 
   return (
     <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-0.5 text-sm">
-      {crumbs.map((crumb, i) => (
-        <Fragment key={crumb.href + i}>
+      {shown.map((crumb, i) => (
+        <Fragment key={crumb ? crumb.href + i : "fold"}>
           {i > 0 && <span className="px-0.5 text-muted-foreground/40">/</span>}
-          <CrumbLink crumb={crumb} current={i === crumbs.length - 1} />
+          {crumb ? (
+            <CrumbLink crumb={crumb} current={i === shown.length - 1} />
+          ) : (
+            <span
+              className="px-1 text-muted-foreground"
+              title={crumbs.slice(2, -2).map((c) => c.label).join(" / ")}
+            >
+              …
+            </span>
+          )}
         </Fragment>
       ))}
     </nav>

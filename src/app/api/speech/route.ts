@@ -5,7 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getFolderRole, roleAtLeast } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
-import { synthesizeSpeech, TTS_MODEL } from "@/lib/tts";
+import { synthesizeSpeech, TTS_CACHE_NAMESPACE } from "@/lib/tts";
+import { UserFacingError } from "@/lib/action-result";
 import { DEFAULT_TTS_VOICE, isTtsVoice } from "@/lib/tts-voices";
 
 // Generating a minute of speech can take a while.
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const hash = createHash("sha256").update(`${TTS_MODEL}|${voice}|${text}`).digest("hex");
+  const hash = createHash("sha256").update(`${TTS_CACHE_NAMESPACE}|${voice}|${text}`).digest("hex");
   const path = `${hash}.wav`;
   const store = storage();
   const publicUrl = store.from(BUCKET).getPublicUrl(path).data.publicUrl;
@@ -65,7 +66,9 @@ export async function POST(request: Request) {
     wav = await synthesizeSpeech(text, voice);
   } catch (err) {
     console.error("Speech synthesis failed", err);
-    const busy = err instanceof Error && /429|quota|503|overloaded/i.test(err.message);
+    // The router only gives up (UserFacingError) when every speech model was busy or out of
+    // quota — the player then reads this section in the device's own voice.
+    const busy = err instanceof UserFacingError;
     return NextResponse.json(
       { error: busy ? "The voice is busy right now — try again in a minute." : "Couldn't generate audio." },
       { status: busy ? 429 : 502 },

@@ -1,18 +1,18 @@
-import { GoogleGenAI, ApiError, Type, type Schema } from "@google/genai";
+import { GoogleGenAI, Type, type Schema } from "@google/genai";
 import type { Difficulty } from "@/generated/prisma/enums";
 import { UserFacingError } from "@/lib/action-result";
+import { withModelFallback } from "@/lib/gemini-router";
 
 // @google/generative-ai (the SDK this used to be built on) was deprecated by Google on
 // 2025-11-30 — no further bug fixes. This uses the current unified SDK instead.
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+// A stalled request shouldn't eat the whole time budget: give up on one model after 40s and let
+// the router try the next.
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, httpOptions: { timeout: 40_000 } });
 
-// gemini-3.6-flash's free-tier quota for structured (schema-constrained) JSON output is tight
-// enough to 429/503 within a handful of requests — verified directly against the API. Flash-Lite
-// is positioned by Google for exactly this kind of high-throughput, low-complexity task, and held
-// up reliably (3/3 in back-to-back testing) where 3.6-flash didn't.
-const MODEL = "gemini-3.5-flash-lite";
-/** Tried when MODEL is overloaded (503) or rate-limited (429) — demand spikes are per model. */
-const FALLBACK_MODEL = "gemini-3.5-flash";
+// Which model writes a quiz is decided per request by lib/gemini-router.ts: the free tier turns
+// requests away per model when it's busy, so the router moves on to another model instead of
+// failing. Flash-Lite is tried first — it's the model Google positions for this kind of
+// high-throughput structured task.
 
 export interface QuizSourcePage {
   id: string;
@@ -117,13 +117,14 @@ STUDY NOTES:
 ${notesContent}
 """`;
 
-  const response = await generateWithRetry((model) =>
+  const response = await withModelFallback((model, abortSignal) =>
     ai.models.generateContent({
       model,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
         responseSchema: buildSchema(multiPage),
+        abortSignal,
       },
     }),
   );
@@ -131,41 +132,27 @@ ${notesContent}
   const text = response.text;
   if (!text) throw new UserFacingError("The AI returned an empty response. Please try again.");
 
-  const parsed = JSON.parse(text) as {
-    questions: (Omit<GeneratedQuizQuestion, "sourcePageId"> & { sourcePageNumber?: number })[];
-  };
+  let parsed: { questions?: (Omit<GeneratedQuizQuestion, "sourcePageId"> & { sourcePageNumber?: number })[] };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // Almost always a reply cut off mid-way on a very long quiz.
+    throw new UserFacingError("The AI's reply got cut off. Try again, or ask for fewer questions.");
+  }
 
-  return parsed.questions.map(({ sourcePageNumber, ...q }) => {
+  // Drop any malformed question rather than show a broken one.
+  const valid = (parsed.questions ?? []).filter(
+    (q) =>
+      typeof q?.questionText === "string" &&
+      Array.isArray(q.options) &&
+      q.options.length === 4 &&
+      q.options.includes(q.correctAnswer),
+  );
+
+  return valid.map(({ sourcePageNumber, ...q }) => {
     if (!multiPage) return { ...q, sourcePageId: pages[0]?.id ?? null };
     const index = sourcePageNumber ? sourcePageNumber - 1 : -1;
     return { ...q, sourcePageId: pages[index]?.id ?? null };
   });
 }
 
-const RETRYABLE_STATUSES = new Set([429, 503]);
-const MAX_ATTEMPTS = 3;
-
-/** Gemini's free tier occasionally returns 503 ("high demand") or 429 (rate limit) — both are
- * transient and usually succeed within a couple of seconds, so retry with backoff, then try the
- * fallback model (demand spikes are per model), before giving up. */
-async function generateWithRetry<T>(fn: (model: string) => Promise<T>): Promise<T> {
-  let lastError: unknown;
-  for (const model of [MODEL, FALLBACK_MODEL]) {
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        return await fn(model);
-      } catch (err) {
-        lastError = err;
-        const retryable = err instanceof ApiError && RETRYABLE_STATUSES.has(err.status);
-        if (!retryable) throw err;
-        if (attempt < MAX_ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt - 1)));
-      }
-    }
-  }
-  if (lastError instanceof ApiError && RETRYABLE_STATUSES.has(lastError.status)) {
-    throw new UserFacingError(
-      "Gemini (the AI that writes quizzes) is overloaded right now. Please try again in a few minutes.",
-    );
-  }
-  throw lastError;
-}

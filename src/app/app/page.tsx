@@ -73,6 +73,10 @@ function MasteryBar({ value }: { value: number }) {
   );
 }
 
+// "Quiz me" / "Review" run a server action from this page; when Google's AI is busy the model
+// router (lib/gemini-router.ts) may need up to ~75s to find a model that answers.
+export const maxDuration = 90;
+
 export default async function DashboardPage() {
   const user = await requireUser();
   const folders = await listVisibleFolders(user.id);

@@ -126,6 +126,8 @@ model Page {
   parent      Page?    @relation("PageTree", fields: [parentId], references: [id], onDelete: Cascade)
   children    Page[]   @relation("PageTree")
   title       String   @default("Untitled")
+  /// Optional emoji shown instead of the default page icon (Notion-style).
+  icon        String?
   content     Json     @default("[]") // BlockNote block JSON
   order       Int      @default(0)
   createdById String

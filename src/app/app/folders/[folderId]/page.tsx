@@ -144,6 +144,7 @@ export default async function FolderPage({
                 id: page.id,
                 title: page.title,
                 parentId: page.parentId,
+                icon: page.icon,
                 depth,
                 descendantCount: descendants.length,
                 mastery: reviewed.length

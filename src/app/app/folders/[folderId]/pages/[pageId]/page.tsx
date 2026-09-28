@@ -22,7 +22,7 @@ export default async function PageDetailPage({
   // The subject's page tree (no content) — for "Pages inside" and "Move to…".
   const folderPages = await prisma.page.findMany({
     where: { folderId },
-    select: { id: true, title: true, parentId: true },
+    select: { id: true, title: true, parentId: true, icon: true },
     orderBy: { order: "asc" },
   });
 
@@ -36,6 +36,7 @@ export default async function PageDetailPage({
         initialFullWidth={page.fullWidth}
         initialSmallText={page.smallText}
         folder={{ id: folderId, name: page.folder.name, pages: folderPages }}
+        initialIcon={page.icon}
       />
     </div>
   );

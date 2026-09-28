@@ -3,16 +3,26 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ChevronRight, CornerLeftUp, FileText } from "lucide-react";
+import { ChevronRight, CornerLeftUp } from "lucide-react";
+import { PageIcon } from "@/components/page-icon";
 import { DeletePageButton } from "@/components/delete-page-button";
-import { movePage } from "@/app/actions/pages";
-import { canNestInto, endPageDrag, getPageDrag, PAGE_DRAG_TYPE, startPageDrag, usePageDrag } from "@/lib/page-drag";
+import { movePage, placePage } from "@/app/actions/pages";
+import {
+  dropPositionFor,
+  endPageDrag,
+  getPageDrag,
+  PAGE_DRAG_TYPE,
+  startPageDrag,
+  usePageDrag,
+  type DropPosition,
+} from "@/lib/page-drag";
 import { cn } from "@/lib/utils";
 
 export interface FolderPageRow {
   id: string;
   title: string;
   parentId: string | null;
+  icon: string | null;
   depth: number;
   descendantCount: number;
   /** Rolled-up mastery over the page and the pages inside it; null if never quizzed. */
@@ -85,8 +95,9 @@ function useCollapsed(folderId: string): Set<string> {
 }
 
 /**
- * The subject's pages as an indented tree. Editors can drag a page onto another to nest it
- * inside, or onto "Move to top level" to take it back out.
+ * The subject's pages as an indented tree. Editors drag a page onto the top/bottom edge of
+ * another to place it before/after it, onto the middle to nest it inside, or onto "Move to top
+ * level" to take it back out.
  */
 export function FolderPageList({
   folderId,
@@ -97,7 +108,7 @@ export function FolderPageList({
   rows: FolderPageRow[];
   canEdit: boolean;
 }) {
-  const [over, setOver] = useState<string | null>(null);
+  const [over, setOver] = useState<{ id: string; pos: DropPosition | "top" } | null>(null);
   const collapsed = useCollapsed(folderId);
   const toggleCollapsed = (id: string) => {
     const next = new Set(collapsed);
@@ -118,19 +129,18 @@ export function FolderPageList({
   const drag = usePageDrag();
   const titleOf = (id: string) => rows.find((r) => r.id === id)?.title || "Untitled";
 
-  function drop(targetId: string | null) {
+  function drop(targetId: string | null, pos: DropPosition) {
     const dragged = getPageDrag();
     endPageDrag();
     setOver(null);
     if (!dragged) return;
     startTransition(async () => {
       try {
-        await movePage(dragged.pageId, targetId);
-        toast.success(
-          targetId
-            ? `Moved "${titleOf(dragged.pageId)}" into "${titleOf(targetId)}"`
-            : `Moved "${titleOf(dragged.pageId)}" to the top level`,
-        );
+        if (targetId) await placePage(dragged.pageId, targetId, pos);
+        else await movePage(dragged.pageId, null);
+        // Reordering is visible in place; only nesting/un-nesting gets a confirmation.
+        if (!targetId) toast.success(`Moved "${titleOf(dragged.pageId)}" to the top level`);
+        else if (pos === "inside") toast.success(`Moved "${titleOf(dragged.pageId)}" into "${titleOf(targetId)}"`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Couldn't move the page.");
       }
@@ -146,7 +156,8 @@ export function FolderPageList({
       className={cn("flex flex-col overflow-hidden rounded-xl border bg-card", pending && "opacity-70")}
     >
       {visibleRows.map((row, i) => {
-        const isTarget = over === row.id;
+        const overPos = over?.id === row.id ? over.pos : null;
+        const isTarget = overPos === "inside";
         const isCollapsed = collapsed.has(row.id);
         return (
           // DeletePageButton is a sibling of the Link, not nested inside it — a <button> inside an
@@ -160,17 +171,20 @@ export function FolderPageList({
               setOver(null);
             }}
             onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE) || !canNestInto(row.id, folderId)) return;
+              if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
+              const pos = dropPositionFor(e, e.currentTarget, row, folderId);
+              if (!pos) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
-              if (over !== row.id) setOver(row.id);
+              if (over?.id !== row.id || over.pos !== pos) setOver({ id: row.id, pos });
             }}
             onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o === row.id ? null : o));
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((o) => (o?.id === row.id ? null : o));
             }}
             onDrop={(e) => {
               e.preventDefault();
-              if (canNestInto(row.id, folderId)) drop(row.id);
+              const pos = dropPositionFor(e, e.currentTarget, row, folderId);
+              if (pos) drop(row.id, pos);
             }}
             className={cn(
               "group relative flex items-center gap-3 pr-2 transition-colors hover:bg-accent",
@@ -179,6 +193,17 @@ export function FolderPageList({
               isTarget && "bg-primary/10 ring-2 ring-primary/60 ring-inset hover:bg-primary/10",
             )}
           >
+            {/* Insertion line for "before" / "after" drops, indented to the row's level. */}
+            {(overPos === "before" || overPos === "after") && (
+              <span
+                aria-hidden
+                style={{ left: 30 + row.depth * 22 }}
+                className={cn(
+                  "pointer-events-none absolute right-2 z-20 h-0.5 rounded-full bg-primary",
+                  overPos === "before" ? "-top-px" : "-bottom-px",
+                )}
+              />
+            )}
             {row.descendantCount > 0 && (
               <button
                 type="button"
@@ -198,7 +223,7 @@ export function FolderPageList({
               style={{ paddingLeft: 34 + row.depth * 22 }}
               className="flex min-w-0 flex-1 items-center gap-3 py-3"
             >
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
+              <PageIcon icon={row.icon} className="size-4 text-[0.9375rem]" />
               <span className={cn("min-w-0 flex-1 truncate text-sm", row.depth === 0 && "font-medium")}>
                 {row.title || "Untitled"}
                 {row.descendantCount > 0 && (
@@ -233,16 +258,16 @@ export function FolderPageList({
             if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
-            if (over !== "__top") setOver("__top");
+            if (over?.pos !== "top") setOver({ id: "__top", pos: "top" });
           }}
-          onDragLeave={() => setOver((o) => (o === "__top" ? null : o))}
+          onDragLeave={() => setOver((o) => (o?.pos === "top" ? null : o))}
           onDrop={(e) => {
             e.preventDefault();
-            drop(null);
+            drop(null, "inside");
           }}
           className={cn(
             "flex items-center justify-center gap-2 border-t border-dashed py-3 text-xs text-muted-foreground transition-colors",
-            over === "__top" && "bg-primary/10 text-primary",
+            over?.pos === "top" && "bg-primary/10 text-primary",
           )}
         >
           <CornerLeftUp className="size-3.5" />

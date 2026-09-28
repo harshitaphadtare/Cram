@@ -35,6 +35,7 @@ import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import { ListenPlayer } from "@/components/listen-player";
 import { SubPages } from "@/components/sub-pages";
+import { PageIconPicker } from "@/components/page-icon";
 import { MovePageDialog } from "@/components/move-page-dialog";
 import { detectLanguageUpdates, enhanceCodeBlock } from "@/lib/code-block";
 import { fixDashBulletsInHtml, shouldPasteAsMarkdown } from "@/lib/markdown-paste";
@@ -129,6 +130,7 @@ export function PageEditor({
   initialFullWidth,
   initialSmallText,
   folder,
+  initialIcon = null,
 }: {
   pageId: string;
   initialTitle: string;
@@ -137,7 +139,13 @@ export function PageEditor({
   initialFullWidth: boolean;
   initialSmallText: boolean;
   /** The page's subject and its page tree — for "Pages inside" and "Move to…". */
-  folder?: { id: string; name: string; pages: { id: string; title: string; parentId: string | null }[] };
+  folder?: {
+    id: string;
+    name: string;
+    pages: { id: string; title: string; parentId: string | null; icon: string | null }[];
+  };
+  /** The page's emoji icon, if it has one. */
+  initialIcon?: string | null;
 }) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [creatingSubPage, startCreatingSubPage] = useTransition();
@@ -261,8 +269,11 @@ export function PageEditor({
         smallText && "cram-small-text",
       )}
     >
-      {/* Title area; hovering it reveals "Add sub-page" beneath the title (like Notion's "Add icon"). */}
+      {/* Title area: page icon (click for the emoji picker), title, then "Add sub-page". */}
       <div className="group/title flex flex-col gap-1">
+      <div className="-ml-1.5">
+        <PageIconPicker pageId={pageId} icon={initialIcon} editable={editable} size="lg" />
+      </div>
       <div data-tour="editor" className="flex items-center justify-between gap-3">
         <input
           value={title}
@@ -330,7 +341,7 @@ export function PageEditor({
             type="button"
             onClick={addSubPage}
             disabled={creatingSubPage}
-            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted-foreground opacity-0 transition-[opacity,background-color,color] group-hover/title:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-60 [@media(hover:none)]:opacity-100"
+            className="-ml-1.5 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted-foreground/80 transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
           >
             {creatingSubPage ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
             Add sub-page
@@ -365,12 +376,7 @@ export function PageEditor({
       </div>
 
       {folder && (
-        <SubPages
-          folderId={folder.id}
-          subPages={folder.pages
-            .filter((p) => p.parentId === pageId)
-            .map((p) => ({ ...p, childCount: folder.pages.filter((c) => c.parentId === p.id).length }))}
-        />
+        <SubPages folderId={folder.id} pageId={pageId} pages={folder.pages} editable={editable} />
       )}
       {folder && editable && (
         <MovePageDialog

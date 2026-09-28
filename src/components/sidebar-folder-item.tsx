@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronRight, FileText, Loader2, Plus, Users } from "lucide-react";
+import { ChevronRight, Loader2, Plus, Users } from "lucide-react";
 import {
   SidebarMenuButton,
   SidebarMenuItem,
@@ -14,8 +14,16 @@ import { folderDotClass } from "@/lib/folder-colors";
 import { cn } from "@/lib/utils";
 import type { VisibleFolder } from "@/lib/data/folders";
 import { buildPageTree, pageAncestors, type PageNode } from "@/lib/page-tree";
-import { canNestInto, endPageDrag, getPageDrag, PAGE_DRAG_TYPE, startPageDrag } from "@/lib/page-drag";
-import { movePage } from "@/app/actions/pages";
+import {
+  dropPositionFor,
+  endPageDrag,
+  getPageDrag,
+  PAGE_DRAG_TYPE,
+  startPageDrag,
+  type DropPosition,
+} from "@/lib/page-drag";
+import { movePage, placePage } from "@/app/actions/pages";
+import { PageIcon } from "@/components/page-icon";
 
 /**
  * A folder row that expands in place to list its pages (Notion's page tree). Hovering the row swaps
@@ -74,7 +82,7 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
               e.preventDefault();
               setFolderDrop(false);
               const drag = getPageDrag();
-              if (drag?.folderId === folder.id && drag.parentId) dropPage(null, folder.pages);
+              if (drag?.folderId === folder.id && drag.parentId) dropPage(null, "inside", folder.pages);
             }}
           >
             <span className="truncate">{folder.name}</span>
@@ -165,26 +173,27 @@ function PageTreeList({ nodes, ...rest }: TreeProps & { nodes: PageNode<SidebarP
   );
 }
 
-/** Moves the page being dragged under `parentId` (null = top level of its subject). */
-function dropPage(parentId: string | null, pages: SidebarPage[]) {
+/**
+ * Drops the page being dragged: before/after/inside `targetId`, or back to the subject's top
+ * level when `targetId` is null. Reordering shows in place; nesting changes get a confirmation.
+ */
+function dropPage(targetId: string | null, pos: DropPosition, pages: SidebarPage[]) {
   const dragged = getPageDrag();
   endPageDrag();
   if (!dragged) return;
   const titleOf = (id: string) => pages.find((p) => p.id === id)?.title || "Untitled";
-  movePage(dragged.pageId, parentId)
-    .then(() =>
-      toast.success(
-        parentId
-          ? `Moved "${titleOf(dragged.pageId)}" into "${titleOf(parentId)}"`
-          : `Moved "${titleOf(dragged.pageId)}" to the top level`,
-      ),
-    )
+  const done = targetId ? placePage(dragged.pageId, targetId, pos) : movePage(dragged.pageId, null);
+  done
+    .then(() => {
+      if (!targetId) toast.success(`Moved "${titleOf(dragged.pageId)}" to the top level`);
+      else if (pos === "inside") toast.success(`Moved "${titleOf(dragged.pageId)}" into "${titleOf(targetId)}"`);
+    })
     .catch((err) => toast.error(err instanceof Error ? err.message : "Couldn't move the page."));
 }
 
 /** One page in the sidebar tree: link, expand arrow when it has sub-pages, "+" for a new sub-page. */
 function PageTreeItem({ node, allPages, folderId, canEdit, openPath }: TreeProps & { node: PageNode<SidebarPage> }) {
-  const [dropTarget, setDropTarget] = useState(false);
+  const [dropPos, setDropPos] = useState<DropPosition | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const { page, depth, children } = node;
@@ -218,23 +227,26 @@ function PageTreeItem({ node, allPages, folderId, canEdit, openPath }: TreeProps
         onDragStart={(e) => startPageDrag(e, page, folderId, allPages)}
         onDragEnd={() => {
           endPageDrag();
-          setDropTarget(false);
+          setDropPos(null);
         }}
         onDragOver={(e) => {
-          if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE) || !canNestInto(page.id, folderId)) return;
+          if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) return;
+          const pos = dropPositionFor(e, e.currentTarget, page, folderId);
+          if (!pos) return;
           e.preventDefault();
           e.dataTransfer.dropEffect = "move";
-          setDropTarget(true);
+          setDropPos(pos);
         }}
         onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropTarget(false);
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropPos(null);
         }}
         onDrop={(e) => {
           e.preventDefault();
-          setDropTarget(false);
-          if (!canNestInto(page.id, folderId)) return;
-          setToggled(true);
-          dropPage(page.id, allPages);
+          setDropPos(null);
+          const pos = dropPositionFor(e, e.currentTarget, page, folderId);
+          if (!pos) return;
+          if (pos === "inside") setToggled(true);
+          dropPage(page.id, pos, allPages);
         }}
       >
         <Link
@@ -246,12 +258,26 @@ function PageTreeItem({ node, allPages, folderId, canEdit, openPath }: TreeProps
             active
               ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
               : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            dropTarget && "bg-primary/15 ring-1 ring-primary/60 ring-inset",
+            dropPos === "inside" && "bg-primary/15 ring-1 ring-primary/60 ring-inset",
           )}
         >
-          <FileText className={cn("size-3.5 shrink-0 opacity-70", hasChildren && "group-hover/page:opacity-0")} />
+          <PageIcon
+            icon={page.icon}
+            className={cn("size-3.5 text-[0.8125rem] opacity-80", hasChildren && "group-hover/page:opacity-0")}
+          />
           <span className="truncate">{page.title || "Untitled"}</span>
         </Link>
+
+        {(dropPos === "before" || dropPos === "after") && (
+          <span
+            aria-hidden
+            style={{ left: indent - 4 }}
+            className={cn(
+              "pointer-events-none absolute right-1 z-10 h-0.5 rounded-full bg-primary",
+              dropPos === "before" ? "-top-px" : "-bottom-px",
+            )}
+          />
+        )}
 
         {/* Expand arrow sits over the page icon (Notion-style) when there are sub-pages. */}
         {hasChildren && (

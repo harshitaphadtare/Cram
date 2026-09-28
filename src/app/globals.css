@@ -567,3 +567,96 @@
   font-size: 0.8125rem;
   color: var(--muted-foreground);
 }
+
+/* Zoom view for diagrams and images (lib/lightbox.ts). */
+.cram-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgb(15 15 15 / 0.72);
+  backdrop-filter: blur(2px);
+  animation: cram-lightbox-in 160ms ease-out;
+}
+.cram-lightbox.is-closing {
+  animation: cram-lightbox-out 140ms ease-in forwards;
+}
+@keyframes cram-lightbox-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes cram-lightbox-out {
+  to {
+    opacity: 0;
+  }
+}
+.cram-lightbox-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.cram-lightbox-stage.is-dragging {
+  cursor: grabbing;
+}
+.cram-lightbox-content {
+  flex-shrink: 0;
+  max-width: none !important;
+  transform-origin: center;
+  /* The diagram sits on the page background (light or dark) so its colours read as on the page. */
+  background: var(--background);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px -12px rgb(0 0 0 / 0.55);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+svg.cram-lightbox-content {
+  padding: 12px;
+  box-sizing: content-box;
+}
+.cram-lightbox-toolbar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.cram-lightbox-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  transition: background-color 120ms, color 120ms;
+}
+.cram-lightbox-button:hover,
+.cram-lightbox-button:focus-visible {
+  background: var(--muted);
+  color: var(--foreground);
+  outline: none;
+}
+.cram-lightbox-zoom {
+  min-width: 3.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+/* Diagrams on the page hint that they open. */
+.cram-mermaid svg {
+  cursor: zoom-in;
+}

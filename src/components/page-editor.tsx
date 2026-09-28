@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   BlockNoteContext,
   SuggestionMenuController,
@@ -37,6 +37,7 @@ import { ListenPlayer } from "@/components/listen-player";
 import { SubPages } from "@/components/sub-pages";
 import { PageIconPicker } from "@/components/page-icon";
 import { MovePageDialog } from "@/components/move-page-dialog";
+import { openLightbox } from "@/lib/lightbox";
 import { detectLanguageUpdates, enhanceCodeBlock } from "@/lib/code-block";
 import { fixDashBulletsInHtml, shouldPasteAsMarkdown } from "@/lib/markdown-paste";
 import {
@@ -173,6 +174,19 @@ export function PageEditor({
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Double-click an image in the notes to open it in the zoom view (a single click still selects
+  // it for resizing). Mermaid diagrams open on a single click — see lib/mermaid-preview.ts.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onDoubleClick = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      const img = target?.closest?.('[data-content-type="image"] img');
+      if (img instanceof HTMLImageElement) openLightbox(img, img.alt || "Image");
+    };
+    el.addEventListener("dblclick", onDoubleClick);
+    return () => el.removeEventListener("dblclick", onDoubleClick);
+  }, []);
   // Grow the title to fit its lines where CSS field-sizing isn't supported (Safari, Firefox).
   useLayoutEffect(() => {
     const el = titleRef.current;

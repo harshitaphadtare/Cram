@@ -59,6 +59,17 @@ function savePrefs(prefs: Prefs) {
   }
 }
 
+/** Every Gemini speech model was busy or out of quota for this section. */
+class VoiceBusyError extends Error {}
+
+/** The most natural-sounding English voice the device offers (Edge/Chrome "Natural"/online voices first). */
+function pickDeviceVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith("en"));
+  const score = (v: SpeechSynthesisVoice) =>
+    (/natural/i.test(v.name) ? 4 : 0) + (/online|google/i.test(v.name) ? 2 : 0) + (v.localService ? 0 : 1);
+  return voices.sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
 /** Rough time Gemini needs to voice a chunk (measured ≈ 65 ms per character, plus overhead). */
 function estimatedPrepMs(text: string) {
   return 1500 + text.length * 65;
@@ -92,6 +103,10 @@ export function ListenPlayer({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urls = useRef(new Map<string, Promise<string>>());
   const runRef = useRef(0);
+  // Reading the current section with the device's built-in voice (all Gemini voices busy).
+  const [deviceVoice, setDeviceVoice] = useState(false);
+  const deviceVoiceRef = useRef(false);
+  const toldAboutDeviceVoice = useRef(false);
   const prefsRef = useRef(prefs);
   const [centerX, setCenterX] = useState<number | null>(null);
   const [minimized, setMinimized] = useState(false);
@@ -116,6 +131,7 @@ export function ListenPlayer({
         }).then(async (res) => {
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
+            if (res.status === 429) throw new VoiceBusyError(body.error ?? "The voice is busy.");
             throw new Error(body.error ?? "Couldn't generate audio.");
           }
           // Cached clips come back as a URL; if caching failed the audio itself comes back.
@@ -133,6 +149,40 @@ export function ListenPlayer({
     [pageId],
   );
 
+  // The device voice moves on to the next section through this ref (playChunk is defined below).
+  const playChunkRef = useRef<((list: SpeechChunk[], i: number) => Promise<void>) | null>(null);
+
+  const speakWithDeviceVoice = useCallback((list: SpeechChunk[], i: number, run: number) => {
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const text = list[i].text;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = pickDeviceVoice();
+    utterance.lang = utterance.voice?.lang ?? "en-US";
+    utterance.rate = prefsRef.current.speed;
+    utterance.onboundary = (e) => {
+      if (run === runRef.current) setFraction(Math.min(1, e.charIndex / Math.max(1, text.length)));
+    };
+    utterance.onend = () => {
+      if (run !== runRef.current) return; // skipped, stopped, or replaced meanwhile
+      deviceVoiceRef.current = false;
+      setDeviceVoice(false);
+      if (i + 1 < list.length) void playChunkRef.current?.(list, i + 1);
+      else {
+        setStatus("done");
+        setFraction(1);
+      }
+    };
+    deviceVoiceRef.current = true;
+    setDeviceVoice(true);
+    setStatus("playing");
+    synth.speak(utterance);
+    if (!toldAboutDeviceVoice.current) {
+      toldAboutDeviceVoice.current = true;
+      toast.info("Gemini's voices are busy — reading with your device's voice until one is free.");
+    }
+  }, []);
+
   const playChunk = useCallback(
     async (list: SpeechChunk[], i: number) => {
       const run = ++runRef.current;
@@ -140,6 +190,11 @@ export function ListenPlayer({
       if (!audio) return;
       const { voice } = prefsRef.current;
       audio.pause();
+      if (deviceVoiceRef.current) {
+        deviceVoiceRef.current = false;
+        setDeviceVoice(false);
+        window.speechSynthesis.cancel();
+      }
       setIndex(i);
       setFraction(0);
       setStatus("loading");
@@ -153,12 +208,22 @@ export function ListenPlayer({
         if (i + 1 < list.length) void clipUrl(list, i + 1, voice).catch(() => {});
       } catch (err) {
         if (run !== runRef.current) return;
+        // Every Gemini voice is busy: read this section with the device's own voice rather than
+        // stop; the next section tries Gemini again.
+        if (err instanceof VoiceBusyError && "speechSynthesis" in window) {
+          speakWithDeviceVoice(list, i, run);
+          return;
+        }
         setStatus("paused");
         toast.error(err instanceof Error ? err.message : "Couldn't play this section.");
       }
     },
-    [clipUrl],
+    [clipUrl, speakWithDeviceVoice],
   );
+  useEffect(() => {
+    playChunkRef.current = playChunk;
+  }, [playChunk]);
+
 
   function start() {
     const list = buildSpeechChunks(getBlocks() as Parameters<typeof buildSpeechChunks>[0]);
@@ -177,6 +242,11 @@ export function ListenPlayer({
   const stop = useCallback(() => {
     runRef.current++;
     audioRef.current?.pause();
+    if (deviceVoiceRef.current) {
+      deviceVoiceRef.current = false;
+      setDeviceVoice(false);
+      window.speechSynthesis.cancel();
+    }
     setChunks(null);
     setMinimized(false);
     setPos(null);
@@ -195,6 +265,16 @@ export function ListenPlayer({
     const audio = audioRef.current;
     if (!chunks || !audio) return;
     if (status === "done") return void playChunk(chunks, 0);
+    if (deviceVoiceRef.current) {
+      if (status === "playing") {
+        window.speechSynthesis.pause();
+        setStatus("paused");
+      } else {
+        window.speechSynthesis.resume();
+        setStatus("playing");
+      }
+      return;
+    }
     if (status === "playing") {
       audio.pause();
       setStatus("paused");
@@ -266,6 +346,7 @@ export function ListenPlayer({
   }, [chunks, index]);
 
   function seekBy(seconds: number) {
+    if (deviceVoiceRef.current) return; // the device voice can't seek
     const audio = audioRef.current;
     if (!chunks || !audio || !audio.duration) return;
     const target = audio.currentTime + seconds;
@@ -372,11 +453,11 @@ export function ListenPlayer({
 
   const transport = (size: "icon-sm" | "icon-xs") => (
     <>
-      <Button variant="ghost" size={size} aria-label="Back 5 seconds" disabled={loading} onClick={() => seekBy(-5)}>
+      <Button variant="ghost" size={size} aria-label="Back 5 seconds" disabled={loading || deviceVoice} onClick={() => seekBy(-5)}>
         <SeekIcon direction="back" />
       </Button>
       {playButton}
-      <Button variant="ghost" size={size} aria-label="Forward 5 seconds" disabled={loading} onClick={() => seekBy(5)}>
+      <Button variant="ghost" size={size} aria-label="Forward 5 seconds" disabled={loading || deviceVoice} onClick={() => seekBy(5)}>
         <SeekIcon direction="forward" />
       </Button>
     </>
@@ -474,7 +555,7 @@ export function ListenPlayer({
                     <span className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
                       {loading
                         ? `Preparing audio… ${Math.round(prep * 100)}%`
-                        : `Section ${index + 1} of ${chunks.length} · ${prefs.speed}×`}
+                        : `Section ${index + 1} of ${chunks.length} · ${deviceVoice ? "Device voice" : `${prefs.speed}×`}`}
                     </span>
                   </div>
 

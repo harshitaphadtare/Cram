@@ -19,6 +19,7 @@ import { searchPages, type PageSearchResult } from "@/app/actions/search";
 import { tabsStore } from "@/lib/tabs-store";
 import { folderDotClass } from "@/lib/folder-colors";
 import { cn } from "@/lib/utils";
+import { pageAncestors } from "@/lib/page-tree";
 import type { BreadcrumbFolder } from "@/components/app-breadcrumb";
 
 interface Item {
@@ -103,11 +104,15 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
     const folderById = new Map(folders.map((f) => [f.id, f]));
     const pageItem = (folderId: string, pageId: string, title: string, snippet?: string | null): Item => {
       const folder = folderById.get(folderId);
+      // Nested pages show their path ("Cybersecurity / Module 1"), so same-named pages differ.
+      const path = folder
+        ? [folder.name, ...pageAncestors(pageId, folder.pages).map((p) => p.title || "Untitled")].join(" / ")
+        : undefined;
       return {
         id: `p-${pageId}`,
         href: `/app/folders/${folderId}/pages/${pageId}`,
         label: title || "Untitled",
-        hint: folder?.name,
+        hint: path,
         snippet,
         icon: <FileText />,
         group: "Pages",

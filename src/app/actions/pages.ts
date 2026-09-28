@@ -8,18 +8,25 @@ import { requireFolderRole } from "@/lib/permissions";
 import { FolderRole } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 
-export async function createPage(folderId: string) {
+/** Creates a page in a folder — at the top level, or as a sub-page of `parentId`. */
+export async function createPage(folderId: string, parentId: string | null = null) {
   const user = await requireUser();
   await requireFolderRole(folderId, user.id, FolderRole.EDITOR);
+  if (parentId) {
+    const parent = await prisma.page.findUnique({ where: { id: parentId }, select: { folderId: true } });
+    if (parent?.folderId !== folderId) throw new Error("That parent page isn't in this subject.");
+  }
 
+  // New pages go last among their siblings.
   const maxOrder = await prisma.page.aggregate({
-    where: { folderId },
+    where: { folderId, parentId },
     _max: { order: true },
   });
 
   const page = await prisma.page.create({
     data: {
       folderId,
+      parentId,
       title: "Untitled",
       content: [],
       order: (maxOrder._max.order ?? -1) + 1,
@@ -66,6 +73,42 @@ export async function deletePage(pageId: string) {
   await requireFolderRole(page.folderId, user.id, FolderRole.EDITOR);
 
   await prisma.page.delete({ where: { id: pageId } });
+  revalidatePath("/app", "layout");
+}
+
+/**
+ * Moves a page (with all its sub-pages) under another page of the same subject, or back to the
+ * top level (`newParentId = null`). It goes last among its new siblings.
+ */
+export async function movePage(pageId: string, newParentId: string | null) {
+  const user = await requireUser();
+  const page = await prisma.page.findUniqueOrThrow({ where: { id: pageId } });
+  await requireFolderRole(page.folderId, user.id, FolderRole.EDITOR);
+  if (page.parentId === newParentId) return;
+
+  if (newParentId) {
+    if (newParentId === pageId) throw new Error("A page can't be moved inside itself.");
+    const pages = await prisma.page.findMany({
+      where: { folderId: page.folderId },
+      select: { id: true, parentId: true },
+    });
+    const target = pages.find((p) => p.id === newParentId);
+    if (!target) throw new Error("That page isn't in this subject.");
+    // Walk up from the target: reaching the moved page means it would end up inside itself.
+    const parentOf = new Map(pages.map((p) => [p.id, p.parentId]));
+    for (let cur: string | null = newParentId, hops = 0; cur && hops < 256; cur = parentOf.get(cur) ?? null, hops++) {
+      if (cur === pageId) throw new Error("A page can't be moved inside one of its own sub-pages.");
+    }
+  }
+
+  const maxOrder = await prisma.page.aggregate({
+    where: { folderId: page.folderId, parentId: newParentId },
+    _max: { order: true },
+  });
+  await prisma.page.update({
+    where: { id: pageId },
+    data: { parentId: newParentId, order: (maxOrder._max.order ?? -1) + 1, updatedById: user.id },
+  });
   revalidatePath("/app", "layout");
 }
 

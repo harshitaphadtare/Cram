@@ -22,6 +22,7 @@ import { dueByTodayWhere } from "@/lib/data/tasks";
 import { TaskItem } from "@/components/task-item";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
+import { buildPageTree, flattenPageTree, pageDescendantIds } from "@/lib/page-tree";
 
 function MasteryPill({ value, due }: { value: number; due: boolean }) {
   return (
@@ -58,6 +59,12 @@ export default async function FolderPage({
   const canEdit = roleAtLeast(role, FolderRole.EDITOR);
   const canManageMembers = roleAtLeast(role, FolderRole.ADMIN);
   const isShared = folder.members.length > 0;
+  // Pages as an indented tree, in reading order (a page, then the pages inside it).
+  const pageRows = flattenPageTree(buildPageTree(folder.pages)).map((n) => ({
+    page: n.page,
+    depth: n.depth,
+    descendants: pageDescendantIds(n.page.id, folder.pages),
+  }));
 
   const [mastery, leaderboard, roadmap, todos] = await Promise.all([
     getFolderMastery(folder.id, user.id),
@@ -102,7 +109,7 @@ export default async function FolderPage({
             {duePageIds.length > 0 && ` · ${duePageIds.length} due for review`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ShareFolderDialog
             folderId={folder.id}
             folderName={folder.name}
@@ -125,7 +132,7 @@ export default async function FolderPage({
           ) : null}
           <QuizMeDialog
             folderId={folder.id}
-            pages={folder.pages.map((p) => ({ id: p.id, title: p.title }))}
+            pages={folder.pages.map((p) => ({ id: p.id, title: p.title, parentId: p.parentId }))}
           />
           {canEdit && <NewPageButton folderId={folder.id} />}
           {role === "OWNER" && (
@@ -147,8 +154,15 @@ export default async function FolderPage({
           </div>
         ) : (
           <div data-tour="folder-pages" className="flex flex-col overflow-hidden rounded-xl border bg-card">
-            {folder.pages.map((page, i) => {
-              const m = mastery.get(page.id);
+            {pageRows.map(({ page, depth, descendants }, i) => {
+              // A page with sub-pages is a module: its mastery averages itself and everything in it.
+              const reviewed = [page.id, ...descendants].flatMap((id) => mastery.get(id) ?? []);
+              const m = reviewed.length
+                ? {
+                    mastery: Math.round(reviewed.reduce((sum, r) => sum + r.mastery, 0) / reviewed.length),
+                    due: reviewed.some((r) => r.due),
+                  }
+                : null;
               return (
                 // DeletePageButton is a sibling of the Link, not nested inside it — a <button>
                 // inside an <a> is invalid HTML and browsers bubble clicks through inconsistently.
@@ -158,10 +172,18 @@ export default async function FolderPage({
                 >
                   <Link
                     href={`/app/folders/${folder.id}/pages/${page.id}`}
-                    className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4"
+                    style={{ paddingLeft: 16 + depth * 22 }}
+                    className="flex min-w-0 flex-1 items-center gap-3 py-3"
                   >
                     <FileText className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{page.title || "Untitled"}</span>
+                    <span className={cn("min-w-0 flex-1 truncate text-sm", depth === 0 ? "font-medium" : "")}>
+                      {page.title || "Untitled"}
+                      {descendants.length > 0 && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          {descendants.length} {descendants.length === 1 ? "page" : "pages"} inside
+                        </span>
+                      )}
+                    </span>
                     {m && <MasteryPill value={m.mastery} due={m.due} />}
                     <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground sm:block">
                       {formatDistanceToNowStrict(page.updatedAt, { addSuffix: true })}
@@ -169,7 +191,7 @@ export default async function FolderPage({
                   </Link>
                   {canEdit && (
                     <div className="opacity-0 transition group-hover:opacity-100">
-                      <DeletePageButton pageId={page.id} title={page.title} />
+                      <DeletePageButton pageId={page.id} title={page.title} subPageCount={descendants.length} />
                     </div>
                   )}
                 </div>

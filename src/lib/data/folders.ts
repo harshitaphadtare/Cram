@@ -9,7 +9,7 @@ export interface VisibleFolder {
   color: string;
   icon: string | null;
   pageCount: number;
-  pages: { id: string; title: string }[];
+  pages: { id: string; title: string; parentId: string | null }[];
   role: FolderRole;
 }
 
@@ -23,7 +23,7 @@ export const listVisibleFolders = cache(async (userId: string): Promise<VisibleF
       OR: [{ ownerId: userId }, { members: { some: { userId } } }],
     },
     include: {
-      pages: { select: { id: true, title: true }, orderBy: { order: "asc" } },
+      pages: { select: { id: true, title: true, parentId: true }, orderBy: { order: "asc" } },
       members: { where: { userId }, select: { role: true } },
     },
     orderBy: { createdAt: "asc" },

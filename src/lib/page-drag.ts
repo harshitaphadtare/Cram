@@ -56,6 +56,30 @@ export function canNestInto(targetId: string, folderId: string) {
   return !!current && current.folderId === folderId && !current.blocked.has(targetId) && current.parentId !== targetId;
 }
 
+export type DropPosition = "before" | "after" | "inside";
+
+/**
+ * Where a drop over `el` (a page row) would put the dragged page: its top third means "before",
+ * bottom third "after", the middle "inside". Returns null where the drop wouldn't make sense
+ * (another subject, the page itself, or somewhere inside it); "inside" its current parent falls
+ * back to before/after, so the middle of a row still reorders.
+ */
+export function dropPositionFor(
+  e: React.DragEvent,
+  el: HTMLElement,
+  target: { id: string; parentId: string | null },
+  folderId: string,
+): DropPosition | null {
+  const drag = current;
+  if (!drag || drag.folderId !== folderId || drag.blocked.has(target.id)) return null;
+  const rect = el.getBoundingClientRect();
+  const ratio = (e.clientY - rect.top) / Math.max(1, rect.height);
+  if (ratio < 0.3) return "before";
+  if (ratio > 0.7) return "after";
+  if (drag.parentId === target.id) return ratio < 0.5 ? "before" : "after";
+  return "inside";
+}
+
 /** The current drag, for components that render drop zones only while dragging. */
 export function usePageDrag() {
   return useSyncExternalStore(

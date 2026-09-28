@@ -1,17 +1,32 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ExternalLink, Link2, PanelTop } from "lucide-react";
+import { ExternalLink, Link2, PanelTop, Trash2 } from "lucide-react";
 import { tabsStore } from "@/lib/tabs-store";
 import { appLinkFrom } from "@/components/app-tabs";
+import { deletePage } from "@/app/actions/pages";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MenuState {
   href: string;
+  /** The link's visible text — the page title for page links. */
+  label: string;
   x: number;
   y: number;
 }
+
+const PAGE_HREF = /^\/app\/folders\/([^/]+)\/pages\/([^/?#]+)/;
 
 /**
  * Replaces the browser's right-click menu on in-app links, so "Open in new tab" opens one of the
@@ -19,7 +34,9 @@ interface MenuState {
  */
 export function LinkContextMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ folderId: string; pageId: string; title: string } | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -30,7 +47,8 @@ export function LinkContextMenu() {
       if (!href) return;
       e.preventDefault();
       setPosition(null);
-      setMenu({ href, x: e.clientX, y: e.clientY });
+      const anchor = (e.target as Element).closest("a");
+      setMenu({ href, label: anchor?.textContent?.trim() ?? "", x: e.clientX, y: e.clientY });
     };
     document.addEventListener("contextmenu", onContextMenu);
     return () => document.removeEventListener("contextmenu", onContextMenu);
@@ -70,7 +88,42 @@ export function LinkContextMenu() {
     setPosition({ left, top });
   }, [menu]);
 
-  if (!menu) return null;
+  function removePage() {
+    if (!confirmDelete) return;
+    const { folderId, pageId, title } = confirmDelete;
+    setConfirmDelete(null);
+    deletePage(pageId)
+      .then(() => {
+        toast.success(`Deleted "${title}"`);
+        // Leave the page if it (or a page inside it) was the one open.
+        if (pathname.startsWith(`/app/folders/${folderId}/pages/${pageId}`)) router.push(`/app/folders/${folderId}`);
+      })
+      .catch(() => toast.error("Couldn't delete the page. You may not have edit access."));
+  }
+
+  const confirmDialog = (
+    <AlertDialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete &ldquo;{confirmDelete?.title}&rdquo;?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently deletes the page, any pages inside it, and quizzes generated from them. This
+            can&apos;t be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={removePage}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  if (!menu) return confirmDialog;
+
+  const pageMatch = PAGE_HREF.exec(menu.href);
 
   const run = (action: () => void) => () => {
     setMenu(null);
@@ -97,9 +150,22 @@ export function LinkContextMenu() {
           .then(() => toast.success("Link copied"))
           .catch(() => toast.error("Couldn't copy the link.")),
     },
+    ...(pageMatch
+      ? [
+          {
+            label: "Delete page",
+            icon: Trash2,
+            destructive: true,
+            action: () =>
+              setConfirmDelete({ folderId: pageMatch[1], pageId: pageMatch[2], title: menu.label || "Untitled" }),
+          },
+        ]
+      : []),
   ];
 
   return (
+    <>
+    {confirmDialog}
     <div
       ref={ref}
       role="menu"
@@ -121,12 +187,17 @@ export function LinkContextMenu() {
           type="button"
           role="menuitem"
           onClick={run(item.action)}
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:bg-accent"
+          className={
+            "destructive" in item
+              ? "mt-1 flex w-full items-center gap-2.5 rounded-md border-t px-2 py-1.5 text-left text-destructive outline-none hover:bg-destructive/10 focus-visible:bg-destructive/10"
+              : "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:bg-accent"
+          }
         >
-          <item.icon className="size-4 text-muted-foreground" />
+          <item.icon className={"destructive" in item ? "size-4" : "size-4 text-muted-foreground"} />
           {item.label}
         </button>
       ))}
     </div>
+    </>
   );
 }

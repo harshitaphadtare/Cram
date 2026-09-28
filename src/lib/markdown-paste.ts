@@ -30,7 +30,23 @@ export function shouldPasteAsMarkdown(clipboard: DataTransfer | null): string | 
   const html = clipboard.getData("text/html");
   if (html && /<(?:ul|ol|pre|table|h[1-6])[\s>]/i.test(html) && !hasFence) return null;
 
-  return text;
+  return normalizeMarkdown(text);
+}
+
+/**
+ * Markdown only treats "- item" as a bullet when a normal space follows the marker. Many apps
+ * copy a non-breaking (or other Unicode) space there instead, which silently turns every bullet
+ * into a "- item" paragraph. Swap those for normal spaces, and turn "•" bullets into "-".
+ */
+export function normalizeMarkdown(text: string): string {
+  // After the marker, accept the spaces Markdown doesn't count as whitespace — no-break, en/em/
+  // thin/narrow no-break, ideographic and zero-width spaces — and rewrite them as one plain space.
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(
+      /^([ \t\u00a0]*)([-*+\u2022]|\d+[.)])(?:[\u00a0\u2000-\u200b\u202f\u205f\u3000]|[ \t])+/gm,
+      (_, lead: string, marker: string) => `${lead.replace(/\u00a0/g, " ")}${marker === "\u2022" ? "-" : marker} `,
+    );
 }
 
 const BULLET_MARKER = /^\s*[-*•–]\s+/;

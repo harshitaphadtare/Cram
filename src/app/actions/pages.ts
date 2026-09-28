@@ -81,34 +81,68 @@ export async function deletePage(pageId: string) {
  * top level (`newParentId = null`). It goes last among its new siblings.
  */
 export async function movePage(pageId: string, newParentId: string | null) {
+  await placePageAt(pageId, newParentId, null);
+}
+
+/**
+ * Drag-and-drop placement: put a page before or after `targetId` (as its sibling), or inside it
+ * (last among its sub-pages). Siblings are renumbered so the order sticks.
+ */
+export async function placePage(pageId: string, targetId: string, position: "before" | "after" | "inside") {
+  if (pageId === targetId) return;
+  const target = await prisma.page.findUniqueOrThrow({ where: { id: targetId }, select: { parentId: true } });
+  if (position === "inside") return placePageAt(pageId, targetId, null);
+  await placePageAt(pageId, target.parentId, { id: targetId, after: position === "after" });
+}
+
+async function placePageAt(
+  pageId: string,
+  parentId: string | null,
+  anchor: { id: string; after: boolean } | null,
+) {
   const user = await requireUser();
   const page = await prisma.page.findUniqueOrThrow({ where: { id: pageId } });
   await requireFolderRole(page.folderId, user.id, FolderRole.EDITOR);
-  if (page.parentId === newParentId) return;
 
-  if (newParentId) {
-    if (newParentId === pageId) throw new Error("A page can't be moved inside itself.");
-    const pages = await prisma.page.findMany({
-      where: { folderId: page.folderId },
-      select: { id: true, parentId: true },
-    });
-    const target = pages.find((p) => p.id === newParentId);
-    if (!target) throw new Error("That page isn't in this subject.");
-    // Walk up from the target: reaching the moved page means it would end up inside itself.
+  const pages = await prisma.page.findMany({
+    where: { folderId: page.folderId },
+    select: { id: true, parentId: true, order: true },
+    orderBy: { order: "asc" },
+  });
+  if (parentId) {
+    if (!pages.some((p) => p.id === parentId)) throw new Error("That page isn't in this subject.");
+    // Walk up from the new parent: reaching the moved page means it would end up inside itself.
     const parentOf = new Map(pages.map((p) => [p.id, p.parentId]));
-    for (let cur: string | null = newParentId, hops = 0; cur && hops < 256; cur = parentOf.get(cur) ?? null, hops++) {
-      if (cur === pageId) throw new Error("A page can't be moved inside one of its own sub-pages.");
+    for (let cur: string | null = parentId, hops = 0; cur && hops < 256; cur = parentOf.get(cur) ?? null, hops++) {
+      if (cur === pageId) throw new Error("A page can't be moved inside itself or one of its own sub-pages.");
     }
   }
 
-  const maxOrder = await prisma.page.aggregate({
-    where: { folderId: page.folderId, parentId: newParentId },
-    _max: { order: true },
-  });
-  await prisma.page.update({
-    where: { id: pageId },
-    data: { parentId: newParentId, order: (maxOrder._max.order ?? -1) + 1, updatedById: user.id },
-  });
+  // New sibling order: the other siblings, with the page slotted in at the anchor (or last).
+  const siblings = pages.filter((p) => p.parentId === parentId && p.id !== pageId).map((p) => p.id);
+  const at = anchor ? siblings.indexOf(anchor.id) : -1;
+  const index = at === -1 ? siblings.length : at + (anchor!.after ? 1 : 0);
+  siblings.splice(index, 0, pageId);
+
+  await prisma.$transaction(
+    siblings.map((id, order) =>
+      prisma.page.update({
+        where: { id },
+        data: id === pageId ? { parentId, order, updatedById: user.id } : { order },
+      }),
+    ),
+  );
+  revalidatePath("/app", "layout");
+}
+
+/** Sets a page's emoji icon (null = back to the default page icon). */
+export async function setPageIcon(pageId: string, icon: string | null) {
+  const user = await requireUser();
+  const page = await prisma.page.findUniqueOrThrow({ where: { id: pageId } });
+  await requireFolderRole(page.folderId, user.id, FolderRole.EDITOR);
+  // An emoji is a few code points (flags, skin tones, ZWJ sequences) — never a long string.
+  const value = icon && [...icon].length <= 16 ? icon : null;
+  await prisma.page.update({ where: { id: pageId }, data: { icon: value, updatedById: user.id } });
   revalidatePath("/app", "layout");
 }
 

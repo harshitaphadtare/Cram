@@ -7,12 +7,13 @@ import { CalendarCheck2, FileText, History, House, Settings, Timer, Trophy } fro
 import { folderDotClass } from "@/lib/folder-colors";
 import { cn } from "@/lib/utils";
 import { pageAncestors } from "@/lib/page-tree";
+import { PageIcon } from "@/components/page-icon";
 
 export type BreadcrumbFolder = {
   id: string;
   name: string;
   color: string;
-  pages: { id: string; title: string; parentId: string | null }[];
+  pages: { id: string; title: string; parentId: string | null; icon?: string | null }[];
 };
 
 interface MenuItem {
@@ -87,13 +88,13 @@ function buildCrumbs(pathname: string, folders: BreadcrumbFolder[]): Crumb[] {
         crumbs.push({
           href: `/app/folders/${folder.id}/pages/${p.id}`,
           label: p.title || "Untitled",
-          icon: <FileText className="size-3.5" />,
+          icon: <PageIcon icon={p.icon} className="size-3.5 text-[0.8125rem]" />,
           menu: folder.pages
             .filter((sibling) => sibling.parentId === p.parentId)
             .map((sibling) => ({
               href: `/app/folders/${folder.id}/pages/${sibling.id}`,
               label: sibling.title || "Untitled",
-              icon: <FileText className="size-3.5" />,
+              icon: <PageIcon icon={sibling.icon} className="size-3.5 text-[0.8125rem]" />,
               active: sibling.id === p.id,
             })),
         });

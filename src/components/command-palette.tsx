@@ -104,6 +104,7 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
     const folderById = new Map(folders.map((f) => [f.id, f]));
     const pageItem = (folderId: string, pageId: string, title: string, snippet?: string | null): Item => {
       const folder = folderById.get(folderId);
+      const pageIcon = folder?.pages.find((p) => p.id === pageId)?.icon;
       // Nested pages show their path ("Cybersecurity / Module 1"), so same-named pages differ.
       const path = folder
         ? [folder.name, ...pageAncestors(pageId, folder.pages).map((p) => p.title || "Untitled")].join(" / ")
@@ -114,7 +115,7 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
         label: title || "Untitled",
         hint: path,
         snippet,
-        icon: <FileText />,
+        icon: pageIcon ? <span className="text-sm leading-none">{pageIcon}</span> : <FileText />,
         group: "Pages",
       };
     };

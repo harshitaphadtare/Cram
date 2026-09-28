@@ -27,7 +27,7 @@ import {
   withMultiColumn,
 } from "@blocknote/xl-multi-column";
 import type { Theme } from "@blocknote/mantine";
-import { FilePlus2, FolderInput, Link2, Loader2, MoreHorizontal } from "lucide-react";
+import { FolderInput, Link2, Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { createPage, updatePageContent, renamePage, updatePageLayout } from "@/app/actions/pages";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import { ListenPlayer } from "@/components/listen-player";
 import { SubPages } from "@/components/sub-pages";
+import { PageIconPicker } from "@/components/page-icon";
 import { MovePageDialog } from "@/components/move-page-dialog";
 import { detectLanguageUpdates, enhanceCodeBlock } from "@/lib/code-block";
 import { fixDashBulletsInHtml, shouldPasteAsMarkdown } from "@/lib/markdown-paste";
@@ -129,6 +130,7 @@ export function PageEditor({
   initialFullWidth,
   initialSmallText,
   folder,
+  initialIcon = null,
 }: {
   pageId: string;
   initialTitle: string;
@@ -137,7 +139,13 @@ export function PageEditor({
   initialFullWidth: boolean;
   initialSmallText: boolean;
   /** The page's subject and its page tree — for "Pages inside" and "Move to…". */
-  folder?: { id: string; name: string; pages: { id: string; title: string; parentId: string | null }[] };
+  folder?: {
+    id: string;
+    name: string;
+    pages: { id: string; title: string; parentId: string | null; icon: string | null }[];
+  };
+  /** The page's emoji icon, if it has one. */
+  initialIcon?: string | null;
 }) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [creatingSubPage, startCreatingSubPage] = useTransition();
@@ -185,14 +193,15 @@ export function PageEditor({
         editor.pasteMarkdown(markdown);
         return true;
       }
-      // Rich text whose bullets arrived as "- item" paragraphs: make them real lists.
+      // Otherwise prefer the rich text when there is some (BlockNote's own fallback would re-read the
+      // raw plain text as Markdown, spacing quirks and all) — fixing bullets that arrived as
+      // "- item" paragraphs on the way.
       const types = event.clipboardData?.types ?? [];
-      if (!types.includes("blocknote/html") && !types.includes("Files")) {
-        const fixed = fixDashBulletsInHtml(event.clipboardData?.getData("text/html") ?? "");
-        if (fixed) {
-          editor.pasteHTML(fixed);
-          return true;
-        }
+      const html = event.clipboardData?.getData("text/html") ?? "";
+      const handledByDefault = ["blocknote/html", "Files", "vscode-editor-data"].some((t) => types.includes(t));
+      if (html && !handledByDefault) {
+        editor.pasteHTML(fixDashBulletsInHtml(html) ?? html);
+        return true;
       }
       return defaultPasteHandler();
     },
@@ -261,8 +270,11 @@ export function PageEditor({
         smallText && "cram-small-text",
       )}
     >
-      {/* Title area; hovering it reveals "Add sub-page" beneath the title (like Notion's "Add icon"). */}
+      {/* Title area: page icon (click for the emoji picker), title, then "Add sub-page". */}
       <div className="group/title flex flex-col gap-1">
+      <div className="-ml-1.5">
+        <PageIconPicker pageId={pageId} icon={initialIcon} editable={editable} size="lg" />
+      </div>
       <div data-tour="editor" className="flex items-center justify-between gap-3">
         <input
           value={title}
@@ -325,14 +337,14 @@ export function PageEditor({
       </div>
 
       {folder && editable && (
-        <div className="-mt-0.5 flex h-7 items-center">
+        <div className="flex items-center">
           <button
             type="button"
             onClick={addSubPage}
             disabled={creatingSubPage}
-            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-muted-foreground opacity-0 transition-[opacity,background-color,color] group-hover/title:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100 disabled:opacity-60 [@media(hover:none)]:opacity-100"
+            className="-ml-2 inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[0.8125rem] font-medium text-muted-foreground/75 transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:outline-none disabled:opacity-60"
           >
-            {creatingSubPage ? <Loader2 className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
+            {creatingSubPage ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
             Add sub-page
           </button>
         </div>
@@ -365,12 +377,7 @@ export function PageEditor({
       </div>
 
       {folder && (
-        <SubPages
-          folderId={folder.id}
-          subPages={folder.pages
-            .filter((p) => p.parentId === pageId)
-            .map((p) => ({ ...p, childCount: folder.pages.filter((c) => c.parentId === p.id).length }))}
-        />
+        <SubPages folderId={folder.id} pageId={pageId} pages={folder.pages} editable={editable} />
       )}
       {folder && editable && (
         <MovePageDialog

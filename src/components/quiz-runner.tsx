@@ -96,11 +96,12 @@ function QuizRunnerInner({ quizId, questions }: QuizRunnerProps) {
   function handleSubmitQuiz() {
     startTransition(async () => {
       try {
-        await submitFullQuiz(quizId, answers);
+        const result = await submitFullQuiz(quizId, answers);
+        if (!result.ok) return void toast.error(result.error);
         clearProgress(quizId);
         router.push(`/app/quiz/${quizId}/results`);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't submit the quiz.");
+      } catch {
+        toast.error("Couldn't submit the quiz. Check your connection and try again.");
       }
     });
   }

@@ -1,5 +1,6 @@
 import { GoogleGenAI, ApiError, Type, type Schema } from "@google/genai";
 import type { Difficulty } from "@/generated/prisma/enums";
+import { UserFacingError } from "@/lib/action-result";
 
 // @google/generative-ai (the SDK this used to be built on) was deprecated by Google on
 // 2025-11-30 — no further bug fixes. This uses the current unified SDK instead.
@@ -10,6 +11,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 // is positioned by Google for exactly this kind of high-throughput, low-complexity task, and held
 // up reliably (3/3 in back-to-back testing) where 3.6-flash didn't.
 const MODEL = "gemini-3.5-flash-lite";
+/** Tried when MODEL is overloaded (503) or rate-limited (429) — demand spikes are per model. */
+const FALLBACK_MODEL = "gemini-3.5-flash";
 
 export interface QuizSourcePage {
   id: string;
@@ -114,9 +117,9 @@ STUDY NOTES:
 ${notesContent}
 """`;
 
-  const response = await generateWithRetry(() =>
+  const response = await generateWithRetry((model) =>
     ai.models.generateContent({
-      model: MODEL,
+      model,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -126,7 +129,7 @@ ${notesContent}
   );
 
   const text = response.text;
-  if (!text) throw new Error("Gemini returned an empty response.");
+  if (!text) throw new UserFacingError("The AI returned an empty response. Please try again.");
 
   const parsed = JSON.parse(text) as {
     questions: (Omit<GeneratedQuizQuestion, "sourcePageId"> & { sourcePageNumber?: number })[];
@@ -143,22 +146,26 @@ const RETRYABLE_STATUSES = new Set([429, 503]);
 const MAX_ATTEMPTS = 3;
 
 /** Gemini's free tier occasionally returns 503 ("high demand") or 429 (rate limit) — both are
- * transient and usually succeed within a couple of seconds, so retry with backoff before giving
- * up rather than failing the quiz generation outright. */
-async function generateWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+ * transient and usually succeed within a couple of seconds, so retry with backoff, then try the
+ * fallback model (demand spikes are per model), before giving up. */
+async function generateWithRetry<T>(fn: (model: string) => Promise<T>): Promise<T> {
   let lastError: unknown;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      const retryable = err instanceof ApiError && RETRYABLE_STATUSES.has(err.status);
-      if (!retryable || attempt === MAX_ATTEMPTS) break;
-      await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt - 1)));
+  for (const model of [MODEL, FALLBACK_MODEL]) {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await fn(model);
+      } catch (err) {
+        lastError = err;
+        const retryable = err instanceof ApiError && RETRYABLE_STATUSES.has(err.status);
+        if (!retryable) throw err;
+        if (attempt < MAX_ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt - 1)));
+      }
     }
   }
   if (lastError instanceof ApiError && RETRYABLE_STATUSES.has(lastError.status)) {
-    throw new Error("Gemini is under heavy load right now. Please try again in a minute.");
+    throw new UserFacingError(
+      "Gemini (the AI that writes quizzes) is overloaded right now. Please try again in a few minutes.",
+    );
   }
   throw lastError;
 }

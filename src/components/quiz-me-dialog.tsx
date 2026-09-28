@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, Sparkles } from "lucide-react";
@@ -48,6 +48,17 @@ export function QuizMeDialog({ folderId, pages: pageList }: { folderId: string; 
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
   const [questionCount, setQuestionCount] = useState(8);
   const [pending, startTransition] = useTransition();
+  // Seconds spent writing the quiz — past the usual few, say what's going on.
+  const [waited, setWaited] = useState(0);
+  useEffect(() => {
+    if (!pending) return;
+    const started = Date.now();
+    const timer = setInterval(() => setWaited(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => {
+      clearInterval(timer);
+      setWaited(0);
+    };
+  }, [pending]);
   const router = useRouter();
 
   // Count only (for display/validation) — kept pure and memoizable, unlike the actual
@@ -256,7 +267,15 @@ export function QuizMeDialog({ folderId, pages: pageList }: { folderId: string; 
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="items-center gap-3 sm:justify-between">
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {pending &&
+              (waited < 12
+                ? "Gemini is writing your questions…"
+                : waited < 30
+                  ? "Still writing — Google's AI is busy, so Cram is trying other models."
+                  : "Almost there — busy days can take up to a minute.")}
+          </p>
           <Button onClick={handleSubmit} disabled={pending || selectedCount === 0}>
             {pending && <Loader2 className="size-4 animate-spin" />}
             {pending ? "Generating…" : "Start quiz"}

@@ -26,6 +26,10 @@ import { buildPageTree, flattenPageTree, pageDescendantIds } from "@/lib/page-tr
 
 const MEDALS = ["text-gold", "text-muted-foreground", "text-streak/80"];
 
+// "Quiz me" / "Review" run a server action from this page; when Google's AI is busy the model
+// router (lib/gemini-router.ts) may need up to ~75s to find a model that answers.
+export const maxDuration = 90;
+
 export default async function FolderPage({
   params,
 }: {

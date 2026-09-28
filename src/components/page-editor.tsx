@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   BlockNoteContext,
   SuggestionMenuController,
@@ -172,6 +172,14 @@ export function PageEditor({
   const colorScheme = resolvedTheme === "dark" ? "dark" : "light";
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  // Grow the title to fit its lines where CSS field-sizing isn't supported (Safari, Firefox).
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el || CSS.supports("field-sizing", "content")) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
   const titleSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editor = useCreateBlockNote({
@@ -265,75 +273,95 @@ export function PageEditor({
     <div
       ref={containerRef}
       className={cn(
-        "mx-auto flex w-full flex-1 flex-col gap-3 pt-10 pb-32",
-        fullWidth ? "max-w-none md:px-6 xl:pr-16" : "max-w-[45rem]",
+        // Notion's page geometry: a 708px text column, centred, with side gutters that — added
+        // to the app layout's own padding (px-5 sm:px-8 md:px-10 lg:px-12) — come to Notion's
+        // ~24px on phones and 96px on desktop. Top space grows with the window's height.
+        "mx-auto flex w-full flex-1 flex-col gap-3 pb-32 pt-[clamp(0.5rem,5vh,3.5rem)]",
+        "px-(--gutter) [--gutter:4px] sm:[--gutter:20px] md:[--gutter:29px] lg:[--gutter:54px]",
+        fullWidth ? "max-w-none" : "max-w-[calc(708px+2*var(--gutter))]",
         smallText && "cram-small-text",
       )}
     >
       {/* Title area: page icon (click for the emoji picker), title, then "Add sub-page". */}
       <div className="group/title flex flex-col gap-1">
-      <div className="-ml-1.5">
-        <PageIconPicker pageId={pageId} icon={initialIcon} editable={editable} size="lg" />
+      {/* Icon row, with the page's actions on the right (Notion keeps them out of the title). */}
+      <div className="flex items-end justify-between gap-3">
+        <div className="-ml-1.5">
+          <PageIconPicker pageId={pageId} icon={initialIcon} editable={editable} size="lg" />
+        </div>
+        <div className="flex shrink-0 items-center gap-1 pb-1">
+          <span className="text-xs text-muted-foreground">{statusLabel}</span>
+          <ListenPlayer pageId={pageId} getBlocks={() => editor.document} anchorRef={containerRef} />
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label="Page options">
+                  <MoreHorizontal />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-56">
+              {/* Base UI requires a group label to live inside a Menu.Group. */}
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Page</DropdownMenuLabel>
+                <DropdownMenuItem
+                  closeOnClick={false}
+                  disabled={!editable}
+                  onClick={() => changeLayout({ fullWidth: !fullWidth })}
+                >
+                  Full width
+                  <ToggleIndicator on={fullWidth} />
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  closeOnClick={false}
+                  disabled={!editable}
+                  onClick={() => changeLayout({ smallText: !smallText })}
+                >
+                  Small text
+                  <ToggleIndicator on={smallText} />
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              {folder && editable && (
+                <DropdownMenuItem onClick={() => setMoveOpen(true)}>
+                  <FolderInput />
+                  Move to…
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={() => {
+                  void navigator.clipboard.writeText(window.location.href);
+                  toast.success("Link copied");
+                }}
+              >
+                <Link2 />
+                Copy link
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-      <div data-tour="editor" className="flex items-center justify-between gap-3">
-        <input
+      <div data-tour="editor">
+        {/* A textarea so long titles wrap onto more lines, like Notion's; it grows to fit. */}
+        <textarea
+          ref={titleRef}
           value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
+          rows={1}
+          onChange={(e) => handleTitleChange(e.target.value.replace(/\n/g, " "))}
+          onKeyDown={(e) => {
+            // Enter moves into the page instead of adding a line break.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              editor.focus();
+            }
+          }}
           disabled={!editable}
           placeholder="Untitled"
+          aria-label="Page title"
           // Already well over 16px, so exempt from the phone "no zoom on focus" input rule.
           data-large-text
-          className="w-full min-w-0 bg-transparent text-[2rem] leading-[1.2] font-bold sm:text-[2.5rem] text-foreground outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-70"
+          className="block w-full resize-none overflow-hidden bg-transparent text-[32px] leading-[1.2] font-bold [field-sizing:content] sm:text-[40px] text-foreground outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-70"
         />
-        <span className="shrink-0 text-xs text-muted-foreground">{statusLabel}</span>
-        <ListenPlayer pageId={pageId} getBlocks={() => editor.document} anchorRef={containerRef} />
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label="Page options">
-                <MoreHorizontal />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" className="w-56">
-            {/* Base UI requires a group label to live inside a Menu.Group. */}
-            <DropdownMenuGroup>
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Page</DropdownMenuLabel>
-              <DropdownMenuItem
-                closeOnClick={false}
-                disabled={!editable}
-                onClick={() => changeLayout({ fullWidth: !fullWidth })}
-              >
-                Full width
-                <ToggleIndicator on={fullWidth} />
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                closeOnClick={false}
-                disabled={!editable}
-                onClick={() => changeLayout({ smallText: !smallText })}
-              >
-                Small text
-                <ToggleIndicator on={smallText} />
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            {folder && editable && (
-              <DropdownMenuItem onClick={() => setMoveOpen(true)}>
-                <FolderInput />
-                Move to…
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              onClick={() => {
-                void navigator.clipboard.writeText(window.location.href);
-                toast.success("Link copied");
-              }}
-            >
-              <Link2 />
-              Copy link
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {folder && editable && (

@@ -20,6 +20,7 @@ import { tabsStore } from "@/lib/tabs-store";
 import { folderDotClass } from "@/lib/folder-colors";
 import { cn } from "@/lib/utils";
 import { pageAncestors } from "@/lib/page-tree";
+import { EmojiGlyph } from "@/components/emoji-picker";
 import type { BreadcrumbFolder } from "@/components/app-breadcrumb";
 
 interface Item {
@@ -115,7 +116,7 @@ export function CommandPalette({ folders }: { folders: BreadcrumbFolder[] }) {
         label: title || "Untitled",
         hint: path,
         snippet,
-        icon: pageIcon ? <span className="text-sm leading-none">{pageIcon}</span> : <FileText />,
+        icon: pageIcon ? <EmojiGlyph emoji={pageIcon} className="size-4" /> : <FileText />,
         group: "Pages",
       };
     };

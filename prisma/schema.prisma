@@ -142,6 +142,9 @@ model Page {
   quizPages     QuizPage[]
   quizQuestions QuizQuestion[]
   reviews       PageReview[]
+  bankQuestions BankQuestion[]
+  /// When the question bank was last (re)generated or attempted — throttles background refreshes.
+  bankAttemptAt DateTime?
 
   @@index([folderId])
   @@index([parentId])
@@ -180,6 +183,26 @@ model QuizPage {
 
   @@unique([quizId, pageId])
   @@map("quiz_pages")
+}
+
+/// Questions written ahead of time for a page (see lib/question-bank.ts), so "Quiz me" can start
+/// instantly and keep working when the AI is busy. `contentHash` records which version of the
+/// page they were written from; a changed page gets a fresh bank in the background.
+model BankQuestion {
+  id            String     @id @default(cuid())
+  pageId        String
+  page          Page       @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  difficulty    Difficulty
+  questionText  String
+  options       Json // string[]
+  correctAnswer String
+  explanation   String?
+  contentHash   String
+  lastUsedAt    DateTime?
+  createdAt     DateTime   @default(now())
+
+  @@index([pageId, difficulty])
+  @@map("bank_questions")
 }
 
 model QuizQuestion {

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { checkAchievements, creditNoteEditing } from "@/lib/gamification";
+import { refreshPageBank } from "@/lib/question-bank";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireFolderRole } from "@/lib/permissions";
@@ -65,6 +67,9 @@ export async function updatePageContent(pageId: string, content: Prisma.InputJso
 
   // Writing notes is studying: active editing time counts toward the goal, XP and streak.
   await creditNoteEditing(user.id);
+
+  // Keep this page's question bank in step with its notes (throttled; after the response).
+  after(() => refreshPageBank(pageId));
 }
 
 export async function deletePage(pageId: string) {

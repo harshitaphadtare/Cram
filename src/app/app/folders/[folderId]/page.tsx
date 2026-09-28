@@ -22,6 +22,8 @@ import { dueByTodayWhere } from "@/lib/data/tasks";
 import { TaskItem } from "@/components/task-item";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
+import { after } from "next/server";
+import { refreshStaleBanks } from "@/lib/question-bank";
 import { buildPageTree, flattenPageTree, pageDescendantIds } from "@/lib/page-tree";
 
 const MEDALS = ["text-gold", "text-muted-foreground", "text-streak/80"];
@@ -44,6 +46,9 @@ export default async function FolderPage({
   const canEdit = roleAtLeast(role, FolderRole.EDITOR);
   const canManageMembers = roleAtLeast(role, FolderRole.ADMIN);
   const isShared = folder.members.length > 0;
+  // Top up question banks that are missing or out of date, so "Quiz me" can start instantly
+  // (throttled per page; runs after the page has been sent).
+  after(() => refreshStaleBanks(folder.pages.map((p) => p.id), 2));
   // Pages as an indented tree, in reading order (a page, then the pages inside it).
   const pageRows = flattenPageTree(buildPageTree(folder.pages)).map((n) => ({
     page: n.page,

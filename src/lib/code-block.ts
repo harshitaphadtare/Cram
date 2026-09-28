@@ -1,8 +1,12 @@
 import { createCodeBlockSpec } from "@blocknote/core";
 import { createLanguageButton, type LanguageList } from "@/lib/code-block-language-menu";
 import { attachMermaidPreview } from "@/lib/mermaid-preview";
+import { detectCodeLanguage, isMermaid } from "@/lib/detect-code-language";
 
 type CodeBlockSpec = ReturnType<typeof createCodeBlockSpec>;
+
+/** Blocks whose language the user picked from the menu this session — never auto-detected. */
+const chosenByUser = new Set<string>();
 
 /**
  * Builds on BlockNote's code block:
@@ -35,7 +39,10 @@ export function enhanceCodeBlock(spec: CodeBlockSpec, languages: LanguageList): 
           languages,
           current: language,
           editable: editor.isEditable,
-          onPick: (next) => editor.updateBlock(block.id, { props: { language: next } }),
+          onPick: (next) => {
+            chosenByUser.add(block.id);
+            editor.updateBlock(block.id, { props: { language: next } });
+          },
         });
         if (select?.parentElement) {
           select.parentElement.classList.add("cram-lang-slot");
@@ -54,7 +61,7 @@ export function enhanceCodeBlock(spec: CodeBlockSpec, languages: LanguageList): 
           // mistake that for an edit, or it rebuilds the block and throws the UI away mid-use.
           ignoreMutation: (m: MutationRecord | { type: "selection"; target: Node }) =>
             menu.button.contains(m.target) ||
-            (mermaid?.isOwnUi(m.target) ?? false) ||
+            (mermaid?.isOwnUi(m) ?? false) ||
             (base.ignoreMutation?.(m) ?? false),
           destroy: () => {
             menu.destroy();
@@ -65,4 +72,48 @@ export function enhanceCodeBlock(spec: CodeBlockSpec, languages: LanguageList): 
       },
     },
   };
+}
+
+interface CodeBlockLike {
+  id: string;
+  type: string;
+  props?: { language?: string };
+  content?: unknown;
+  children?: CodeBlockLike[];
+}
+
+function blockText(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content.map((c) => (typeof c?.text === "string" ? c.text : "")).join("");
+}
+
+/**
+ * Sets the language of code blocks nobody has chosen one for, from their contents:
+ * - "Plain Text" blocks (the default for new blocks) get whatever the code looks like;
+ * - blocks on the old JavaScript default that clearly hold Mermaid become Mermaid.
+ * Returns the updates to apply, so the caller can batch them.
+ */
+export function detectLanguageUpdates(
+  blocks: CodeBlockLike[],
+  languages: LanguageList,
+): { id: string; language: string }[] {
+  const updates: { id: string; language: string }[] = [];
+  const walk = (list: CodeBlockLike[]) => {
+    for (const b of list) {
+      if (b.type === "codeBlock" && !chosenByUser.has(b.id)) {
+        const code = blockText(b.content);
+        const current = b.props?.language ?? "text";
+        const detected =
+          current === "text"
+            ? detectCodeLanguage(code, languages)
+            : current === "javascript" && isMermaid(code)
+              ? "mermaid"
+              : null;
+        if (detected && detected !== current) updates.push({ id: b.id, language: detected });
+      }
+      if (b.children?.length) walk(b.children);
+    }
+  };
+  walk(blocks);
+  return updates;
 }

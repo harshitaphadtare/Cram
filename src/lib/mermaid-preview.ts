@@ -110,6 +110,23 @@ function blockText(content: unknown): string {
 }
 
 /**
+ * Runs `callback` once `el` is attached to the document. The editor inserts a block's DOM right
+ * after rendering it (or when the editor itself mounts); off-screen copies made for copy/paste
+ * never are, so after a few seconds we stop checking. Timers rather than animation frames, which
+ * don't run in background tabs.
+ */
+function whenOnPage(el: HTMLElement, callback: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let tries = 0;
+  const check = () => {
+    if (el.isConnected) return callback();
+    if (++tries < 200) timer = setTimeout(check, 25);
+  };
+  timer = setTimeout(check, 0);
+  return () => clearTimeout(timer);
+}
+
+/**
  * Wraps a rendered Mermaid code block (`blockDom`, whose editable code is `source`) so it shows
  * the diagram, with a Show code / Hide code toggle.
  */
@@ -133,7 +150,6 @@ export function attachMermaidPreview(
   const diagram = document.createElement("div");
   diagram.className = "cram-mermaid";
   preview.append(toggle, diagram);
-  wrapper.append(preview);
 
   // The editor fills the code element after render, so read the code from the block itself.
   const code = blockText(block.content);
@@ -152,23 +168,37 @@ export function attachMermaidPreview(
   });
   applyToggle();
 
-  // Show the last drawing straight away (no flicker), then redraw if the code changed.
-  latestTarget.set(id, diagram);
-  const previous = lastDrawn.get(id);
-  if (previous) diagram.replaceChildren(...previous.map((n) => n.cloneNode(true)));
-  else diagram.replaceChildren(hint("Drawing diagram…"));
-  const cached = svgCache.has(`${currentTheme()}\n${code.trim()}`);
-  scheduleDraw(id, code, !previous || cached);
-
-  // Edits don't always rebuild the block, so also redraw when its code text changes.
+  // BlockNote also renders blocks off-screen to copy/paste them, and reads that DOM back as
+  // content — the panel's labels would come back as stray paragraphs. So the panel is only added
+  // (and drawn) once this block is actually on the page.
   const observer = new MutationObserver(() => scheduleDraw(id, source.textContent ?? "", false));
-  observer.observe(source, { characterData: true, childList: true, subtree: true });
+  let mounted = false;
+  const cancelMount = whenOnPage(wrapper, () => {
+    mounted = true;
+    wrapper.append(preview);
+
+    // Show the last drawing straight away (no flicker), then redraw if the code changed.
+    latestTarget.set(id, diagram);
+    const previous = lastDrawn.get(id);
+    if (previous) diagram.replaceChildren(...previous.map((n) => n.cloneNode(true)));
+    else diagram.replaceChildren(hint("Drawing diagram…"));
+    const cached = svgCache.has(`${currentTheme()}\n${code.trim()}`);
+    scheduleDraw(id, code, !previous || cached);
+
+    // Edits don't always rebuild the block, so also redraw when its code text changes.
+    observer.observe(source, { characterData: true, childList: true, subtree: true });
+  });
 
   return {
     dom: wrapper,
-    /** Clicks in the diagram/toggle must not be treated as edits by the editor. */
-    isOwnUi: (target: Node) => preview.contains(target),
+    /**
+     * DOM changes that are ours, not edits: anything inside the panel, and the panel being added
+     * to the wrapper. Otherwise the editor rebuilds the block, which re-adds the panel, forever.
+     */
+    isOwnUi: (m: { type: string; target: Node }) => m.target === wrapper || preview.contains(m.target),
     destroy: () => {
+      cancelMount();
+      if (!mounted) return;
       observer.disconnect();
       if (latestTarget.get(id) === diagram) latestTarget.delete(id);
     },

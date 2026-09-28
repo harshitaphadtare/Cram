@@ -33,7 +33,8 @@ import { toast } from "sonner";
 import { assertUploadSize } from "@/lib/uploads";
 import { PageOutline, extractHeadings } from "@/components/page-outline";
 import { ListenPlayer } from "@/components/listen-player";
-import { enhanceCodeBlock } from "@/lib/code-block";
+import { detectLanguageUpdates, enhanceCodeBlock } from "@/lib/code-block";
+import { shouldPasteAsMarkdown } from "@/lib/markdown-paste";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,7 +54,8 @@ const codeLanguages = {
   mermaid: { name: "Mermaid", aliases: ["mmd"] },
 };
 const codeBlock = enhanceCodeBlock(
-  createCodeBlockSpec({ ...codeBlockOptions, supportedLanguages: codeLanguages }),
+  // New blocks start as Plain Text; the language is then detected from what's typed or pasted.
+  createCodeBlockSpec({ ...codeBlockOptions, defaultLanguage: "text", supportedLanguages: codeLanguages }),
   codeLanguages,
 );
 
@@ -153,12 +155,31 @@ export function PageEditor({
         : undefined,
     uploadFile: uploadImage,
     extensions: [syntaxHighlighter],
+    // Notes copied from Notion/Claude/ChatGPT: read the Markdown version of the clipboard when the
+    // HTML version has lost the bullets and code blocks (see lib/markdown-paste.ts).
+    pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+      if (editor.getTextCursorPosition().block.type === "codeBlock") return defaultPasteHandler();
+      const markdown = shouldPasteAsMarkdown(event.clipboardData);
+      if (!markdown) return defaultPasteHandler();
+      editor.pasteMarkdown(markdown);
+      return true;
+    },
   });
+  const detectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [headings, setHeadings] = useState(() => extractHeadings(editor.document as unknown as Block[]));
 
   const handleChange = useCallback(() => {
     setHeadings(extractHeadings(editor.document as unknown as Block[]));
+    // Pick code block languages from their contents once typing/pasting settles.
+    if (detectTimer.current) clearTimeout(detectTimer.current);
+    detectTimer.current = setTimeout(() => {
+      const updates = detectLanguageUpdates(editor.document as never, codeLanguages);
+      if (updates.length === 0) return;
+      editor.transact(() => {
+        for (const u of updates) editor.updateBlock(u.id, { props: { language: u.language } });
+      });
+    }, 400);
   }, [editor]);
 
   function changeLayout(patch: { fullWidth?: boolean; smallText?: boolean }) {

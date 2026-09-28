@@ -231,8 +231,8 @@ export function PomodoroTimer({
   return (
     // Exactly the height left under the 84px top bar and the layout padding, so nothing scrolls.
     <div className="-mb-10 flex h-[calc(100svh-8.25rem)] w-full flex-col md:h-[calc(100svh-9.25rem)]">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Toolbar — wraps on phones, where the mode switch and task picker don't fit on one line. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-0.5 rounded-lg bg-muted p-0.5">
           {MODES.map((m) => (
             <button

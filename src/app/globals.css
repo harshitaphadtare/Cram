@@ -343,10 +343,11 @@
   }
 }
 
-/* iOS Safari zooms into any focused field under 16px; keep form text at 16px on phones. */
-@media (max-width: 640px) {
-  input,
-  textarea,
+/* iOS Safari zooms into any focused field under 16px; keep form text at 16px on touch phones.
+   (Touch only — a narrow desktop window doesn't zoom, and there it made fields look oversized.) */
+@media (max-width: 640px) and (pointer: coarse) {
+  input:not([data-large-text]),
+  textarea:not([data-large-text]),
   select {
     font-size: 16px !important;
   }
@@ -514,11 +515,12 @@
   }
 }
 .cram-lang-search {
-  margin: 0.5rem;
-  border-radius: 7px;
+  margin: 0.375rem 0.375rem 0.25rem;
+  height: 1.875rem;
+  border-radius: 6px;
   border: 1px solid var(--input);
   background: color-mix(in oklab, var(--foreground) 4%, transparent);
-  padding: 0.375rem 0.625rem;
+  padding: 0 0.5rem;
   font-size: 0.8125rem;
   color: var(--foreground);
   outline: none;

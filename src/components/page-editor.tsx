@@ -214,7 +214,9 @@ export function PageEditor({
           onChange={(e) => handleTitleChange(e.target.value)}
           disabled={!editable}
           placeholder="Untitled"
-          className="w-full bg-transparent text-[2.5rem] leading-[1.2] font-bold text-foreground outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-70"
+          // Already well over 16px, so exempt from the phone "no zoom on focus" input rule.
+          data-large-text
+          className="w-full min-w-0 bg-transparent text-[2rem] leading-[1.2] font-bold sm:text-[2.5rem] text-foreground outline-none placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-70"
         />
         <span className="shrink-0 text-xs text-muted-foreground">{statusLabel}</span>
         <ListenPlayer pageId={pageId} getBlocks={() => editor.document} anchorRef={containerRef} />

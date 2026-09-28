@@ -64,7 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           </header>
-          <div className="flex flex-1 flex-col px-4 pt-6 pb-16 md:px-10 md:pt-10">
+          <div className="flex min-w-0 flex-1 flex-col px-5 pt-6 pb-16 sm:px-8 md:px-10 md:pt-10 lg:px-12">
             <PageTransition>{children}</PageTransition>
           </div>
         </SidebarInset>

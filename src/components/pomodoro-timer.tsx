@@ -174,13 +174,25 @@ export function PomodoroTimer({
   goalMinutes: number;
   streak: number;
 }) {
-  const { settings, mode, secondsLeft, totalSeconds, isRunning, sessionsToday, startPause, reset, switchMode, taskId } =
-    usePomodoro();
+  const {
+    settings,
+    mode,
+    secondsLeft,
+    totalSeconds,
+    isRunning,
+    sessionsToday,
+    cycleSessions,
+    startPause,
+    reset,
+    resetCycle,
+    switchMode,
+    taskId,
+  } = usePomodoro();
 
   const isBreak = mode !== "WORK";
   const skip = () =>
     switchMode(
-      isBreak ? "WORK" : (sessionsToday + 1) % settings.longBreakInterval === 0 ? "LONG_BREAK" : "SHORT_BREAK",
+      isBreak ? "WORK" : (cycleSessions + 1) % settings.longBreakInterval === 0 ? "LONG_BREAK" : "SHORT_BREAK",
     );
 
   useEffect(() => {
@@ -198,8 +210,10 @@ export function PomodoroTimer({
   });
 
   const elapsed = totalSeconds > 0 ? 1 - secondsLeft / totalSeconds : 0;
-  const cyclePosition = sessionsToday % settings.longBreakInterval;
+  const cyclePosition = cycleSessions % settings.longBreakInterval;
   const started = secondsLeft < totalSeconds;
+  // Something to start over from: sessions done in this cycle, a break, or a session under way.
+  const canResetCycle = cyclePosition > 0 || isBreak || started;
   const taskTitle = tasks.find((t) => t.id === taskId)?.title;
 
   const status = isRunning
@@ -276,9 +290,22 @@ export function PomodoroTimer({
               );
             })}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {isBreak ? MODE_LABEL[mode] : `Session ${cyclePosition + 1} of ${settings.longBreakInterval}`}
-          </p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{isBreak ? MODE_LABEL[mode] : `Session ${cyclePosition + 1} of ${settings.longBreakInterval}`}</span>
+            {canResetCycle && (
+              <>
+                <span aria-hidden>·</span>
+                <button
+                  type="button"
+                  onClick={resetCycle}
+                  title="Start over at session 1 with a fresh focus timer. Today's completed sessions stay counted."
+                  className="rounded underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-foreground hover:decoration-foreground"
+                >
+                  Reset sessions
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Controls */}

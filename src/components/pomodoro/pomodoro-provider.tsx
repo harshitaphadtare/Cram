@@ -58,6 +58,15 @@ interface SavedTimer {
   /** Remaining seconds while paused. */
   secondsLeft: number;
   taskId?: string;
+  /** Today's session count when the cycle was last reset (see `resetCycle`), and which day. */
+  cycleStart?: number;
+  cycleDay?: string;
+}
+
+/** Local calendar day, so a cycle reset from yesterday doesn't carry over. */
+function localDay() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 function loadTimer(): SavedTimer | null {
@@ -94,10 +103,14 @@ interface PomodoroContextValue {
   /** True once a session has been started and not reset — drives the top-bar mini timer. */
   isActive: boolean;
   sessionsToday: number;
+  /** Focus sessions completed in the current cycle (restarts on `resetCycle`, and daily). */
+  cycleSessions: number;
   taskId: string | undefined;
   setTaskId: (id: string | undefined) => void;
   startPause: () => void;
   reset: () => void;
+  /** Start the cycle over at "Session 1" with a fresh focus timer. Logged sessions are kept. */
+  resetCycle: () => void;
   switchMode: (mode: Mode) => void;
   updateSettings: (patch: Partial<PomodoroSettings>) => void;
 }
@@ -129,6 +142,8 @@ export function PomodoroProvider({
   const [isActive, setIsActive] = useState(false);
   const [sessionsToday, setSessionsToday] = useState(initialSessionsToday);
   const [taskId, setTaskId] = useState<string | undefined>(undefined);
+  const [cycleStart, setCycleStart] = useState(0);
+  const cycleSessions = Math.max(0, sessionsToday - cycleStart);
   const endTimeRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restoredRef = useRef(false);
@@ -161,6 +176,9 @@ export function PomodoroProvider({
       setSecondsLeft(durationFor(saved?.mode ?? "WORK", loaded));
       setTaskId(saved?.taskId);
     }
+    if (saved?.cycleDay === localDay() && typeof saved.cycleStart === "number") {
+      setCycleStart(saved.cycleStart);
+    }
     restoredRef.current = true;
   }, []);
 
@@ -174,6 +192,8 @@ export function PomodoroProvider({
       endTime: isRunning ? endTimeRef.current : null,
       secondsLeft: isRunning ? 0 : secondsLeft,
       taskId,
+      cycleStart,
+      cycleDay: localDay(),
     };
     try {
       window.localStorage.setItem(TIMER_KEY, JSON.stringify(saved));
@@ -181,7 +201,7 @@ export function PomodoroProvider({
       // Storage unavailable — the timer just won't survive a reload.
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, isRunning, isActive, taskId, isRunning ? null : secondsLeft]);
+  }, [mode, isRunning, isActive, taskId, cycleStart, isRunning ? null : secondsLeft]);
 
   const goToMode = useCallback(
     (m: Mode, autoStart: boolean) => {
@@ -220,12 +240,12 @@ export function PomodoroProvider({
     }
 
     if (mode === "WORK") {
-      const next: Mode = (sessionsToday + 1) % settings.longBreakInterval === 0 ? "LONG_BREAK" : "SHORT_BREAK";
+      const next: Mode = (cycleSessions + 1) % settings.longBreakInterval === 0 ? "LONG_BREAK" : "SHORT_BREAK";
       goToMode(next, settings.autoStartBreaks);
     } else {
       goToMode("WORK", settings.autoStartWork);
     }
-  }, [mode, settings, sessionsToday, taskId, goToMode]);
+  }, [mode, settings, cycleSessions, taskId, goToMode]);
 
   useEffect(() => {
     if (!isRunning) {
@@ -283,6 +303,15 @@ export function PomodoroProvider({
     setSecondsLeft(durationFor(mode, settings));
   }, [mode, settings]);
 
+  const resetCycle = useCallback(() => {
+    setCycleStart(sessionsToday);
+    setIsRunning(false);
+    setIsActive(false);
+    endTimeRef.current = null;
+    setMode("WORK");
+    setSecondsLeft(durationFor("WORK", settings));
+  }, [sessionsToday, settings]);
+
   const updateSettings = useCallback(
     (patch: Partial<PomodoroSettings>) => {
       const next = { ...settings, ...patch };
@@ -306,14 +335,30 @@ export function PomodoroProvider({
       isRunning,
       isActive,
       sessionsToday,
+      cycleSessions,
       taskId,
       setTaskId,
       startPause,
       reset,
+      resetCycle,
       switchMode: (m: Mode) => goToMode(m, false),
       updateSettings,
     }),
-    [settings, mode, secondsLeft, isRunning, isActive, sessionsToday, taskId, startPause, reset, goToMode, updateSettings],
+    [
+      settings,
+      mode,
+      secondsLeft,
+      isRunning,
+      isActive,
+      sessionsToday,
+      cycleSessions,
+      taskId,
+      startPause,
+      reset,
+      resetCycle,
+      goToMode,
+      updateSettings,
+    ],
   );
 
   return <PomodoroContext.Provider value={value}>{children}</PomodoroContext.Provider>;

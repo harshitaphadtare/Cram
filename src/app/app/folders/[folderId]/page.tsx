@@ -10,7 +10,7 @@ import { FolderRole } from "@/generated/prisma/enums";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NewPageButton } from "@/components/new-page-button";
-import { DeletePageButton } from "@/components/delete-page-button";
+import { FolderPageList } from "@/components/folder-page-list";
 import { QuizMeDialog } from "@/components/quiz-me-dialog";
 import { ShareFolderDialog } from "@/components/share-folder-dialog";
 import { FolderSettingsMenu } from "@/components/folder-settings-menu";
@@ -23,25 +23,6 @@ import { TaskItem } from "@/components/task-item";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { buildPageTree, flattenPageTree, pageDescendantIds } from "@/lib/page-tree";
-
-function MasteryPill({ value, due }: { value: number; due: boolean }) {
-  return (
-    <span className="flex items-center gap-2" title={due ? "Due for review" : "Mastery"}>
-      <span className="h-1 w-14 overflow-hidden rounded-full bg-muted-foreground/15">
-        <span
-          className={cn(
-            "cram-grow-x block h-full rounded-full",
-            value >= 80 ? "bg-chart-3" : value >= 50 ? "bg-gold" : "bg-streak",
-          )}
-          style={{ width: `${Math.max(4, value)}%` }}
-        />
-      </span>
-      <span className={cn("w-8 text-right text-xs tabular-nums", due ? "text-streak" : "text-muted-foreground")}>
-        {value}%
-      </span>
-    </span>
-  );
-}
 
 const MEDALS = ["text-gold", "text-muted-foreground", "text-streak/80"];
 
@@ -153,51 +134,28 @@ export default async function FolderPage({
             {canEdit && <p className="text-sm">Create your first page to start taking notes.</p>}
           </div>
         ) : (
-          <div data-tour="folder-pages" className="flex flex-col overflow-hidden rounded-xl border bg-card">
-            {pageRows.map(({ page, depth, descendants }, i) => {
+          <FolderPageList
+            folderId={folder.id}
+            canEdit={canEdit}
+            rows={pageRows.map(({ page, depth, descendants }) => {
               // A page with sub-pages is a module: its mastery averages itself and everything in it.
               const reviewed = [page.id, ...descendants].flatMap((id) => mastery.get(id) ?? []);
-              const m = reviewed.length
-                ? {
-                    mastery: Math.round(reviewed.reduce((sum, r) => sum + r.mastery, 0) / reviewed.length),
-                    due: reviewed.some((r) => r.due),
-                  }
-                : null;
-              return (
-                // DeletePageButton is a sibling of the Link, not nested inside it — a <button>
-                // inside an <a> is invalid HTML and browsers bubble clicks through inconsistently.
-                <div
-                  key={page.id}
-                  className={cn("group flex items-center gap-3 pr-2 transition-colors hover:bg-accent", i > 0 && "border-t")}
-                >
-                  <Link
-                    href={`/app/folders/${folder.id}/pages/${page.id}`}
-                    style={{ paddingLeft: 16 + depth * 22 }}
-                    className="flex min-w-0 flex-1 items-center gap-3 py-3"
-                  >
-                    <FileText className="size-4 shrink-0 text-muted-foreground" />
-                    <span className={cn("min-w-0 flex-1 truncate text-sm", depth === 0 ? "font-medium" : "")}>
-                      {page.title || "Untitled"}
-                      {descendants.length > 0 && (
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
-                          {descendants.length} {descendants.length === 1 ? "page" : "pages"} inside
-                        </span>
-                      )}
-                    </span>
-                    {m && <MasteryPill value={m.mastery} due={m.due} />}
-                    <span className="hidden w-28 shrink-0 text-right text-xs text-muted-foreground sm:block">
-                      {formatDistanceToNowStrict(page.updatedAt, { addSuffix: true })}
-                    </span>
-                  </Link>
-                  {canEdit && (
-                    <div className="opacity-0 transition group-hover:opacity-100">
-                      <DeletePageButton pageId={page.id} title={page.title} subPageCount={descendants.length} />
-                    </div>
-                  )}
-                </div>
-              );
+              return {
+                id: page.id,
+                title: page.title,
+                parentId: page.parentId,
+                depth,
+                descendantCount: descendants.length,
+                mastery: reviewed.length
+                  ? {
+                      value: Math.round(reviewed.reduce((sum, r) => sum + r.mastery, 0) / reviewed.length),
+                      due: reviewed.some((r) => r.due),
+                    }
+                  : null,
+                updatedLabel: formatDistanceToNowStrict(page.updatedAt, { addSuffix: true }),
+              };
             })}
-          </div>
+          />
         )}
 
         <aside data-tour="folder-sidebar" className="cram-stagger flex flex-col gap-6">

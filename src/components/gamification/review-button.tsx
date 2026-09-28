@@ -33,15 +33,16 @@ export function ReviewButton({
       onClick={() =>
         startTransition(async () => {
           try {
-            const quizId = await startQuiz({
+            const result = await startQuiz({
               folderId,
               pageIds,
               difficulty: Difficulty.MEDIUM,
               questionCount: Math.min(10, Math.max(5, pageIds.length * 3)),
             });
-            router.push(`/app/quiz/${quizId}`);
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Couldn't start the review.");
+            if (!result.ok) return void toast.error(result.error);
+            router.push(`/app/quiz/${result.data}`);
+          } catch {
+            toast.error("Couldn't start the review. Check your connection and try again.");
           }
         })
       }

@@ -9,8 +9,18 @@ import { generateQuizQuestions } from "@/lib/gemini";
 import { blocksToText } from "@/lib/blocknote-to-text";
 import { creditActivity, recordPageReviews } from "@/lib/gamification";
 import { quizXp } from "@/lib/xp";
+import { toActionResult, UserFacingError, type ActionResult } from "@/lib/action-result";
 
 export async function startQuiz(input: {
+  folderId: string;
+  pageIds: string[];
+  difficulty: Difficulty;
+  questionCount: number;
+}): Promise<ActionResult<string>> {
+  return toActionResult("Couldn't generate the quiz. Please try again.", () => createQuiz(input));
+}
+
+async function createQuiz(input: {
   folderId: string;
   pageIds: string[];
   difficulty: Difficulty;
@@ -19,16 +29,16 @@ export async function startQuiz(input: {
   const user = await requireUser();
   await requireFolderRole(input.folderId, user.id, FolderRole.VIEWER);
 
-  if (input.pageIds.length === 0) throw new Error("Select at least one page to quiz on.");
+  if (input.pageIds.length === 0) throw new UserFacingError("Select at least one page to quiz on.");
 
   const pages = await prisma.page.findMany({
     where: { id: { in: input.pageIds }, folderId: input.folderId },
   });
-  if (pages.length === 0) throw new Error("Couldn't find the selected pages.");
+  if (pages.length === 0) throw new UserFacingError("Couldn't find the selected pages.");
 
   const sourcePages = pages.map((p) => ({ id: p.id, title: p.title, content: blocksToText(p.content) }));
   if (!sourcePages.some((p) => p.content.trim())) {
-    throw new Error("The selected pages don't have any content to quiz on yet.");
+    throw new UserFacingError("The selected pages don't have any content to quiz on yet.");
   }
 
   const questionCount = Math.min(Math.max(input.questionCount, 3), 20);
@@ -40,7 +50,7 @@ export async function startQuiz(input: {
   });
 
   if (generated.length === 0) {
-    throw new Error("The AI couldn't generate questions from these notes. Try different pages.");
+    throw new UserFacingError("The AI couldn't generate questions from these notes. Try different pages.");
   }
 
   const folder = await prisma.folder.findUniqueOrThrow({ where: { id: input.folderId } });
@@ -71,14 +81,21 @@ export async function startQuiz(input: {
 
 /** Answers aren't scored or saved until the whole quiz is submitted at once — no per-question
  * feedback, matching a real exam rather than a flashcard flow. */
-export async function submitFullQuiz(quizId: string, answers: Record<string, string>) {
+export async function submitFullQuiz(
+  quizId: string,
+  answers: Record<string, string>,
+): Promise<ActionResult<{ correctCount: number; totalQuestions: number; xpGained: number }>> {
+  return toActionResult("Couldn't submit the quiz. Please try again.", () => scoreQuiz(quizId, answers));
+}
+
+async function scoreQuiz(quizId: string, answers: Record<string, string>) {
   const user = await requireUser();
   const quiz = await prisma.quiz.findUniqueOrThrow({
     where: { id: quizId },
     include: { questions: true, pages: { select: { pageId: true } } },
   });
-  if (quiz.userId !== user.id) throw new Error("Not your quiz.");
-  if (quiz.status === "completed") throw new Error("This quiz was already submitted.");
+  if (quiz.userId !== user.id) throw new UserFacingError("Not your quiz.");
+  if (quiz.status === "completed") throw new UserFacingError("This quiz was already submitted.");
 
   let correctCount = 0;
   await prisma.$transaction(

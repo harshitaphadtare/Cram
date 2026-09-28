@@ -1,3 +1,5 @@
+import { openLightbox } from "@/lib/lightbox";
+
 /**
  * Notion-style Mermaid code blocks: the block shows the rendered diagram, with a toggle to show
  * the editable source. The diagram re-renders as the source is edited.
@@ -150,6 +152,11 @@ export function attachMermaidPreview(
   const diagram = document.createElement("div");
   diagram.className = "cram-mermaid";
   preview.append(toggle, diagram);
+  // Click the diagram to open it in the zoom view (like Notion).
+  diagram.addEventListener("click", () => {
+    const svg = diagram.querySelector("svg");
+    if (svg) openLightbox(svg, "Diagram");
+  });
 
   // The editor fills the code element after render, so read the code from the block itself.
   const code = blockText(block.content);

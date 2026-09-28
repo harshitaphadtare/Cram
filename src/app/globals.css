@@ -445,6 +445,11 @@
 :root:not(.dark) .bn-container .bn-block-content[data-content-type="codeBlock"] .shiki {
   color: var(--shiki-light);
 }
+/* Breathing room between code blocks (and diagrams) and the text around them. */
+.bn-editor .bn-block:has(> .bn-block-content[data-content-type="codeBlock"]),
+.bn-editor .bn-block:has(> .cram-mermaid-block) {
+  padding-block: 0.625rem;
+}
 .bn-container .bn-block-content[data-content-type="codeBlock"] > pre {
   padding: 2.25rem 1.25rem 1.125rem;
 }

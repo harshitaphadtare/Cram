@@ -32,3 +32,68 @@ export function shouldPasteAsMarkdown(clipboard: DataTransfer | null): string | 
 
   return text;
 }
+
+const BULLET_MARKER = /^\s*[-*•–]\s+/;
+
+/**
+ * Some apps (Claude, ChatGPT and others) put bullets on the clipboard as plain paragraphs that
+ * start with "- " (<p>- Protecting PII</p>, or several lines in one <p> split by <br>), so they
+ * paste as dash-prefixed paragraphs with paragraph spacing. Turns runs of those into real <ul>
+ * lists. Returns the fixed HTML, or null if there was nothing to fix.
+ */
+export function fixDashBulletsInHtml(html: string): string | null {
+  if (!html || !/<p[\s>]/i.test(html)) return null;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  let changed = false;
+
+  // A <p> holding several "- item" lines separated by <br>: split into one <p> per line first.
+  for (const p of [...doc.querySelectorAll("p")]) {
+    if (!p.querySelector("br")) continue;
+    const parts: Node[][] = [[]];
+    for (const node of [...p.childNodes]) {
+      if (node.nodeName === "BR") parts.push([]);
+      else parts[parts.length - 1].push(node);
+    }
+    const lines = parts.filter((nodes) => nodes.some((n) => n.textContent?.trim()));
+    if (lines.length < 2 || !lines.every((nodes) => BULLET_MARKER.test(nodes.map((n) => n.textContent).join("")))) continue;
+    const replacements = lines.map((nodes) => {
+      const line = doc.createElement("p");
+      line.append(...nodes);
+      return line;
+    });
+    p.replaceWith(...replacements);
+    changed = true;
+  }
+
+  // Runs of consecutive "- item" paragraphs become one list.
+  const isBulletP = (el: Element | null): el is HTMLParagraphElement =>
+    !!el && el.tagName === "P" && BULLET_MARKER.test(el.textContent ?? "");
+  for (const p of [...doc.querySelectorAll("p")]) {
+    if (!p.isConnected || !isBulletP(p) || isBulletP(p.previousElementSibling)) continue;
+    const run: HTMLParagraphElement[] = [];
+    for (let el: Element | null = p; isBulletP(el); el = el.nextElementSibling) run.push(el);
+    const ul = doc.createElement("ul");
+    for (const item of run) {
+      stripLeadingMarker(item);
+      const li = doc.createElement("li");
+      li.append(...item.childNodes);
+      ul.append(li);
+    }
+    p.before(ul);
+    run.forEach((item) => item.remove());
+    changed = true;
+  }
+
+  return changed ? doc.body.innerHTML : null;
+}
+
+/** Removes the "- " / "• " marker from the first text in an element (it may be inside <span>s). */
+function stripLeadingMarker(el: Element) {
+  const walker = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent ?? "";
+    if (!text.trim()) continue;
+    node.textContent = text.replace(BULLET_MARKER, "");
+    return;
+  }
+}

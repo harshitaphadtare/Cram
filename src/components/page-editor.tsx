@@ -37,7 +37,7 @@ import { ListenPlayer } from "@/components/listen-player";
 import { SubPages } from "@/components/sub-pages";
 import { MovePageDialog } from "@/components/move-page-dialog";
 import { detectLanguageUpdates, enhanceCodeBlock } from "@/lib/code-block";
-import { shouldPasteAsMarkdown } from "@/lib/markdown-paste";
+import { fixDashBulletsInHtml, shouldPasteAsMarkdown } from "@/lib/markdown-paste";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -181,9 +181,20 @@ export function PageEditor({
     pasteHandler: ({ event, editor, defaultPasteHandler }) => {
       if (editor.getTextCursorPosition().block.type === "codeBlock") return defaultPasteHandler();
       const markdown = shouldPasteAsMarkdown(event.clipboardData);
-      if (!markdown) return defaultPasteHandler();
-      editor.pasteMarkdown(markdown);
-      return true;
+      if (markdown) {
+        editor.pasteMarkdown(markdown);
+        return true;
+      }
+      // Rich text whose bullets arrived as "- item" paragraphs: make them real lists.
+      const types = event.clipboardData?.types ?? [];
+      if (!types.includes("blocknote/html") && !types.includes("Files")) {
+        const fixed = fixDashBulletsInHtml(event.clipboardData?.getData("text/html") ?? "");
+        if (fixed) {
+          editor.pasteHTML(fixed);
+          return true;
+        }
+      }
+      return defaultPasteHandler();
     },
   });
   const detectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

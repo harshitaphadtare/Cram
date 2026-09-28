@@ -9,6 +9,24 @@ import { generateQuizQuestions } from "@/lib/gemini";
 import { blocksToText } from "@/lib/blocknote-to-text";
 import { creditActivity, recordPageReviews } from "@/lib/gamification";
 import { quizXp } from "@/lib/xp";
+import { after } from "next/server";
+import type { GeneratedQuizQuestion } from "@/lib/gemini";
+import {
+  contentHash,
+  drawFromBank,
+  markBankQuestionsUsed,
+  refreshStaleBanks,
+  saveLiveQuestionsToBank,
+} from "@/lib/question-bank";
+
+function shuffle<T>(items: T[]): T[] {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 import { toActionResult, UserFacingError, type ActionResult } from "@/lib/action-result";
 
 export async function startQuiz(input: {
@@ -42,16 +60,64 @@ async function createQuiz(input: {
   }
 
   const questionCount = Math.min(Math.max(input.questionCount, 3), 20);
+  const withContent = sourcePages.filter((p) => p.content.trim());
+  const hashes = new Map(withContent.map((p) => [p.id, contentHash(p.content)]));
 
-  const generated = await generateQuizQuestions({
-    pages: sourcePages,
-    difficulty: input.difficulty,
-    count: questionCount,
-  });
+  // 1. Questions written ahead of time for these exact page versions (instant, no AI call).
+  const banked = await drawFromBank({ hashes, difficulty: input.difficulty, count: questionCount });
 
-  if (generated.length === 0) {
+  // 2. Write the shortfall live (then keep it in the bank for next time).
+  let live: GeneratedQuizQuestion[] = [];
+  let liveError: unknown = null;
+  const missing = questionCount - banked.length;
+  if (missing > 0) {
+    // Pages with the fewest banked questions first — that's where the gap is.
+    const bankedPerPage = new Map<string, number>();
+    for (const q of banked) bankedPerPage.set(q.sourcePageId, (bankedPerPage.get(q.sourcePageId) ?? 0) + 1);
+    const needy = [...withContent].sort((a, b) => (bankedPerPage.get(a.id) ?? 0) - (bankedPerPage.get(b.id) ?? 0));
+    try {
+      live = await generateQuizQuestions({
+        pages: banked.length > 0 ? needy.slice(0, Math.max(1, Math.ceil(needy.length / 2))) : withContent,
+        difficulty: input.difficulty,
+        count: Math.max(3, missing),
+        // With some banked questions in hand, don't keep the user waiting as long for the rest.
+        geminiDeadlineMs: banked.length > 0 ? 20_000 : undefined,
+      });
+    } catch (err) {
+      liveError = err;
+    }
+  }
+
+  // 3. Outage fallback: older banked questions (earlier page versions / other difficulties).
+  let fallback: Awaited<ReturnType<typeof drawFromBank>> = [];
+  if (banked.length + live.length < questionCount) {
+    fallback = await drawFromBank({
+      hashes,
+      difficulty: input.difficulty,
+      count: questionCount - banked.length - live.length,
+      fallback: true,
+      exclude: new Set(banked.map((q) => q.bankId)),
+    });
+  }
+
+  const generated = shuffle([
+    ...banked,
+    ...live.slice(0, questionCount - banked.length),
+    ...fallback,
+  ]).slice(0, questionCount);
+
+  if (generated.length < Math.min(3, questionCount)) {
+    if (liveError) throw liveError;
     throw new UserFacingError("The AI couldn't generate questions from these notes. Try different pages.");
   }
+
+  const usedBankIds = [...banked, ...fallback].map((q) => q.bankId);
+  after(async () => {
+    await markBankQuestionsUsed(usedBankIds);
+    if (live.length > 0) await saveLiveQuestionsToBank(live, input.difficulty, hashes);
+    // Top up banks that are missing or out of date, for next time.
+    await refreshStaleBanks([...hashes.keys()], 2);
+  });
 
   const folder = await prisma.folder.findUniqueOrThrow({ where: { id: input.folderId } });
 

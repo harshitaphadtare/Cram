@@ -7,6 +7,10 @@ import { FolderRole } from "@/generated/prisma/enums";
 import { PageEditorClient } from "@/components/page-editor-client";
 import type { Block } from "@blocknote/core";
 
+// Saving notes schedules a question-bank refresh (lib/question-bank.ts) after the response;
+// writing a bank can take ~10–30s when the AI is busy.
+export const maxDuration = 60;
+
 export default async function PageDetailPage({
   params,
 }: {

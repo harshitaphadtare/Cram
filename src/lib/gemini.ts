@@ -127,6 +127,7 @@ const QUESTION_RULES = `Rules:
 - Exactly one option must be correct, and "correctAnswer" must match that option string exactly.
 - Do not invent facts that aren't supported by the notes.
 - Vary question phrasing and avoid trivially guessable options.
+- Ask direct conceptual questions about the subject itself, as a textbook or exam would. Never refer to the notes, the text, the page, the author or "the definition given" in a question, its options or its explanation — no "according to the notes", "the notes' definition", "as described above" or "what do you think". Bad: "Which core pillar of the notes' definition is violated?" Good: "Which principle of the CIA triad is violated when an attacker gains unauthorized access to data?"
 - Write a short explanation for each correct answer.`;
 
 /**

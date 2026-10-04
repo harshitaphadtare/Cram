@@ -48,6 +48,9 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
 - **Weekly leaderboards** in shared folders (opt out in Settings).
 - **Reset progress** (Settings): start streak, XP, level, achievements and study stats over from
   zero, behind a type-RESET confirmation. Notes, folders, tasks and quiz history are kept.
+- **Reminder emails** in the student's timezone: a morning plan (reviews and tasks due), a
+  streak-at-risk nudge at 8 pm, comeback nudges after a few days away, and a Sunday recap. Each
+  can be turned off in Settings or from the email itself.
 
 | Action | XP |
 | --- | --- |
@@ -126,6 +129,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, confirm your email
 - [Google (and optional Microsoft) sign-in setup](docs/AUTH-PROVIDERS.md)
 - [Manual test checklist](docs/TESTING.md)
 - [Deploying to Vercel + Supabase](docs/DEPLOYMENT.md)
+- [Reminder emails (Resend + hourly schedule)](docs/EMAILS.md)
 
 ## Scripts
 

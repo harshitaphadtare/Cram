@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { SettingsForm } from "@/components/settings-form";
 import { StudyPreferences } from "@/components/study-preferences";
 import { AccountActions } from "@/components/account-actions";
+import { EmailPreferences } from "@/components/email-preferences";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -16,6 +17,12 @@ export default async function SettingsPage() {
       <StudyPreferences
         dailyGoalMin={user.dailyGoalMin}
         showOnLeaderboard={user.showOnLeaderboard}
+      />
+
+      <EmailPreferences
+        emailReminders={user.emailReminders}
+        emailPlan={user.emailPlan}
+        emailWeekly={user.emailWeekly}
       />
 
       <SettingsForm

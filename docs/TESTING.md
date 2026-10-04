@@ -69,7 +69,16 @@ sections so you see what a new student sees. Tick each box as you go.
       go to zero; notes, folders, tasks and quiz history remain; old quizzes don't re-unlock badges.
 - [ ] Skip a day (or wait) → a streak freeze covers it (❄ on the week strip).
 
-## 9. General
+## 9. Emails
+- [ ] Settings → **Email notifications**: each switch saves and survives a reload.
+- [ ] `?test=` each of `plan`, `weekly`, `comeback`, `streak_risk` (docs/EMAILS.md) → arrives,
+      looks right in Gmail on desktop and phone, and the button opens the right page.
+- [ ] The email's **Unsubscribe** link → confirm page → that switch is now off in Settings.
+- [ ] Gmail's own "Unsubscribe" button next to the sender name turns that switch off too.
+- [ ] `?dryRun=1` lists sensible emails; after the hourly job runs, `email_logs` has rows and
+      nobody got the same email twice in a day.
+
+## 10. General
 - [ ] Every page in **light and dark** mode.
 - [ ] Phone width (≈375 px): landing, login, dashboard, a page, Pomodoro.
 - [ ] No red errors in the browser console on the main pages.

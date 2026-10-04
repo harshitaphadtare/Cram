@@ -52,6 +52,30 @@ export async function sendEmail(email: {
   }
 }
 
+/**
+ * EMAIL_REMINDERS_FOR — optional comma-separated list of account emails. When set, only those
+ * accounts get reminder emails (and see the email settings). Made for running Cram without a
+ * verified domain: Resend's test sender can only reach the Resend account owner anyway.
+ */
+function reminderAllowlist(): string[] | null {
+  const list = (process.env.EMAIL_REMINDERS_FOR ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list.length ? list : null;
+}
+
+export function remindersAllowedFor(email: string): boolean {
+  const list = reminderAllowlist();
+  return !list || list.includes(email.toLowerCase());
+}
+
+/** The same list, as a Prisma filter for the hourly run. */
+export function reminderRecipientsFilter(): { email?: { in: string[]; mode: "insensitive" } } {
+  const list = reminderAllowlist();
+  return list ? { email: { in: list, mode: "insensitive" } } : {};
+}
+
 /** The site's public address, for links in emails. */
 export function appUrl(path = ""): string {
   const base = (process.env.APP_URL || "https://cram-eta.vercel.app").replace(/\/$/, "");

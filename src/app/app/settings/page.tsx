@@ -3,6 +3,7 @@ import { SettingsForm } from "@/components/settings-form";
 import { StudyPreferences } from "@/components/study-preferences";
 import { AccountActions } from "@/components/account-actions";
 import { EmailPreferences } from "@/components/email-preferences";
+import { remindersAllowedFor } from "@/lib/email/send";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -19,11 +20,13 @@ export default async function SettingsPage() {
         showOnLeaderboard={user.showOnLeaderboard}
       />
 
-      <EmailPreferences
-        emailReminders={user.emailReminders}
-        emailPlan={user.emailPlan}
-        emailWeekly={user.emailWeekly}
-      />
+      {remindersAllowedFor(user.email) && (
+        <EmailPreferences
+          emailReminders={user.emailReminders}
+          emailPlan={user.emailPlan}
+          emailWeekly={user.emailWeekly}
+        />
+      )}
 
       <SettingsForm
         user={{

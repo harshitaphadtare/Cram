@@ -22,11 +22,20 @@ recorded in the `email_logs` table first, so overlapping runs can't double-send.
 
 ## Setup
 
-### 1. Resend: verify a domain
+### Just for yourself (free, no domain)
 
 Resend's shared test sender (`onboarding@resend.dev`) only delivers to the email address your
-Resend account was created with. To email students you need a domain you own (a `.vercel.app`
-address can't be verified):
+Resend account was created with. That's enough to get reminders yourself:
+
+1. Make sure your Cram account and your Resend account use the **same email address**.
+2. In Vercel, set `EMAIL_REMINDERS_FOR` to that address and leave `EMAIL_FROM` empty (plus
+   `RESEND_API_KEY` and `CRON_SECRET`, see step 2 below). Only listed accounts get reminders or
+   see the email switches in Settings; everyone else sees nothing.
+3. Continue from step 3.
+
+### 1. For everyone: verify a domain
+
+To email other students you need a domain you own (a `.vercel.app` address can't be verified):
 
 1. Buy a domain (e.g. from Cloudflare, Namecheap or Porkbun), or use one you have.
 2. Resend → **Domains → Add domain**. Using a subdomain such as `mail.yourdomain.com` keeps
@@ -43,6 +52,7 @@ Vercel → your project → **Settings → Environment Variables** (Production),
 | `RESEND_API_KEY` | Resend → API Keys (already set if signup alerts work) |
 | `EMAIL_FROM` | e.g. `Cram <reminders@mail.yourdomain.com>` (on the verified domain) |
 | `CRON_SECRET` | A long random string. Use the one in your local `.env`. It authorises the hourly call and signs unsubscribe links, so don't change it casually: old unsubscribe links stop working. |
+| `EMAIL_REMINDERS_FOR` | Optional. Comma-separated account emails; when set, only these accounts get reminders. |
 | `APP_URL` | Optional. Links in emails point here. Defaults to `https://cram-eta.vercel.app`. |
 
 ### 3. Try it on yourself

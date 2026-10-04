@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { ACHIEVEMENTS, LEVEL_KEY_PREFIX } from "@/lib/achievements";
 import { levelInfo } from "@/lib/levels";
-import { appUrl, sendEmail } from "@/lib/email/send";
+import { appUrl, reminderRecipientsFilter, sendEmail } from "@/lib/email/send";
 import { unsubscribeOneClickUrl, unsubscribePageUrl, type EmailPref } from "@/lib/email/unsubscribe";
 import { comebackEmail, planEmail, streakRiskEmail, weeklyEmail, type RenderedEmail } from "@/lib/email/templates";
 
@@ -305,7 +305,10 @@ export interface RunResult {
 
 export async function runReminders({ dryRun = false, now = new Date() } = {}): Promise<RunResult> {
   const users = await prisma.user.findMany({
-    where: { OR: [{ emailReminders: true }, { emailPlan: true }, { emailWeekly: true }] },
+    where: {
+      OR: [{ emailReminders: true }, { emailPlan: true }, { emailWeekly: true }],
+      ...reminderRecipientsFilter(),
+    },
     select: userSelect,
   });
   const result: RunResult = { checked: users.length, sent: [], wouldSend: [], failed: [] };

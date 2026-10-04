@@ -1,13 +1,39 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Flame } from "lucide-react";
+import { getStreakCount } from "@/app/actions/gamification";
 import { cn } from "@/lib/utils";
 
 export function StreakBadge({
-  count,
+  count: initialCount,
   className,
 }: {
   count: number;
   className?: string;
 }) {
+  const pathname = usePathname();
+  const [count, setCount] = useState(initialCount);
+  const [lastInitial, setLastInitial] = useState(initialCount);
+  if (initialCount !== lastInitial) {
+    // The layout re-rendered (e.g. after an action revalidated it) with a fresh count.
+    setLastInitial(initialCount);
+    setCount(initialCount);
+  }
+
+  // The layout keeps this badge mounted across navigations, so its server-rendered count goes
+  // stale (e.g. a streak that broke overnight). Re-check whenever the page changes.
+  useEffect(() => {
+    let cancelled = false;
+    getStreakCount()
+      .then((n) => !cancelled && setCount(n))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
+
   const active = count > 0;
   return (
     <div

@@ -50,6 +50,15 @@ export async function resetProgress() {
   revalidatePath("/app", "layout");
 }
 
+/**
+ * The current streak, after spending freezes or breaking it for missed days. The top-bar badge
+ * calls this on navigation, because the app layout it lives in doesn't re-render between pages.
+ */
+export async function getStreakCount() {
+  const user = await requireUser();
+  return user.streakCount;
+}
+
 export async function updateLeaderboardVisibility(show: boolean) {
   const user = await requireUser();
   await prisma.user.update({ where: { id: user.id }, data: { showOnLeaderboard: show } });

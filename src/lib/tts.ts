@@ -20,14 +20,11 @@ export const TTS_MODELS = [
 ];
 
 /**
- * Part of every cached clip's name. Kept at the original model's name on purpose: clips are
- * interchangeable across models, and this keeps every clip already cached playable for free.
+ * Part of every cached clip's name; clips are interchangeable across models. Bumped when what we
+ * send changes: clips from before "notes-only" were sent with a style instruction that some models
+ * read out loud, so they must not be replayed.
  */
-export const TTS_CACHE_NAMESPACE = "gemini-3.1-flash-tts-preview";
-
-const STYLE_PROMPT =
-  "Read the following study notes aloud in a calm, warm and unhurried voice, like a patient tutor. " +
-  "Pause briefly between sections. Read only the notes:";
+export const TTS_CACHE_NAMESPACE = "notes-only-v2";
 
 /** Wraps raw 16-bit little-endian PCM in a WAV header so browsers can play it. */
 function pcmToWav(pcm: Buffer, sampleRate: number, channels = 1): Buffer {
@@ -49,13 +46,17 @@ function pcmToWav(pcm: Buffer, sampleRate: number, channels = 1): Buffer {
   return Buffer.concat([header, pcm]);
 }
 
-/** Speaks `text` in the given voice (calm by default) and returns a playable WAV file. */
+/**
+ * Speaks `text` in the given voice (calm by default) and returns a playable WAV file.
+ * Only the notes themselves are sent: speech models treat everything in the prompt as the script,
+ * and a style instruction ahead of the notes was sometimes read aloud. The voice sets the tone.
+ */
 export async function synthesizeSpeech(text: string, voice: TtsVoice = DEFAULT_TTS_VOICE): Promise<Buffer> {
   const response = await withModelFallback(
     (model, abortSignal) =>
       ai.models.generateContent({
         model,
-        contents: [{ role: "user", parts: [{ text: `${STYLE_PROMPT}\n\n${text}` }] }],
+        contents: [{ role: "user", parts: [{ text }] }],
         config: {
           responseModalities: ["AUDIO"],
           speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },

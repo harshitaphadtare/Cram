@@ -45,7 +45,8 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
 - **Streaks** with **streak freezes** (one earned per week, max 2) that protect a missed day.
 - **XP and levels**, **17 achievements**, and celebration popups for unlocks and level-ups.
 - **Progress page**: level, stats, **where your time went** (study time per folder, and per task
-  for tasks without a folder, by week / month / year), a 12-week activity heatmap and every
+  for tasks without a folder, by week / month / year, with the tasks inside each folder), a
+  year-long activity heatmap and every
   achievement.
 - **Weekly leaderboards** in shared folders (opt out in Settings).
 - **Reset progress** (Settings): start streak, XP, level, achievements and study stats over from

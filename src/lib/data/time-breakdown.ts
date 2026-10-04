@@ -7,7 +7,7 @@ import { addDays, userToday } from "@/lib/gamification";
 
 /**
  * Progress → "Where your time went": study time per folder (focus sessions on the folder's tasks +
- * writing its notes), per task that has no folder (focus sessions), and "Unassigned" (focus with no
+ * writing its notes), per task that has no folder (focus sessions), and "Unsorted" (focus with no
  * task, and note-writing from before it was tracked per folder), over a week, month or year.
  */
 
@@ -21,9 +21,11 @@ export interface TimeEntity {
   key: string;
   label: string;
   kind: "folder" | "task" | "unassigned" | "other";
-  /** 1-based colour slot for folders/tasks; null for the grey Unassigned/Other. */
+  /** 1-based colour slot for folders/tasks; null for the grey Unsorted/Other. */
   slot: number | null;
   seconds: number;
+  /** What the time was spent on: each task (focus sessions) and "Writing notes", largest first. */
+  parts: { label: string; seconds: number }[];
 }
 
 export interface TimeColumn {
@@ -146,12 +148,17 @@ export async function getTimeBreakdown(user: User, range: TimeRange, offset: num
   const perBucket = new Map<string, Map<string, number>>();
   const perDayTracked = new Map<string, number>();
   const labels = new Map<string, string>();
-  const add = (date: Date, key: string, seconds: number) => {
+  // Entity → what it was spent on (task title, "Writing notes"…) → seconds.
+  const parts = new Map<string, Map<string, number>>();
+  const add = (date: Date, key: string, seconds: number, part: string) => {
     if (seconds <= 0 || date < start || date >= end) return;
     const b = bucketOf(date);
     const m = perBucket.get(b) ?? new Map<string, number>();
     m.set(key, (m.get(key) ?? 0) + seconds);
     perBucket.set(b, m);
+    const p = parts.get(key) ?? new Map<string, number>();
+    p.set(part, (p.get(part) ?? 0) + seconds);
+    parts.set(key, p);
   };
   const track = (date: Date, seconds: number) => {
     const d = date.toISOString().slice(0, 10);
@@ -163,23 +170,29 @@ export async function getTimeBreakdown(user: User, range: TimeRange, offset: num
     const date = localDate(s.startedAt, user.timezone);
     const seconds = s.durationMin * 60;
     let key = "u";
-    if (s.task?.folderId && folderById.has(s.task.folderId)) key = `f:${s.task.folderId}`;
-    else if (s.task && !s.task.folderId) {
+    let part = "Focus with no task";
+    if (s.task?.folderId && folderById.has(s.task.folderId)) {
+      key = `f:${s.task.folderId}`;
+      part = s.task.title;
+    } else if (s.task && !s.task.folderId) {
       key = `t:${s.task.id}`;
+      part = "Focus sessions";
       labels.set(key, s.task.title);
+    } else if (s.task) {
+      part = s.task.title; // its folder is no longer shared with you
     }
-    add(date, key, seconds);
+    add(date, key, seconds, part);
     if (date >= start && date < end) track(date, seconds);
   }
   for (const n of noteTime) {
-    add(n.date, folderById.has(n.folderId) ? `f:${n.folderId}` : "u", n.seconds);
+    add(n.date, folderById.has(n.folderId) ? `f:${n.folderId}` : "u", n.seconds, "Writing notes");
     track(n.date, n.seconds);
   }
   // Whatever the day's total holds beyond what's attributed (note-writing from before it was
-  // tracked per folder) is Unassigned, so this always adds up to the rest of Progress.
+  // tracked per folder) is Unsorted, so this always adds up to the rest of Progress.
   for (const l of logs) {
     const d = l.date.toISOString().slice(0, 10);
-    add(l.date, "u", l.seconds - (perDayTracked.get(d) ?? 0));
+    add(l.date, "u", l.seconds - (perDayTracked.get(d) ?? 0), "Notes from before folders were tracked");
   }
 
   // Entities with any time in the period; ones without a colour slot fold into "Other".
@@ -189,17 +202,25 @@ export async function getTimeBreakdown(user: User, range: TimeRange, offset: num
   const folded = new Map<string, number>();
   for (const [k, s] of totals) folded.set(fold(k), (folded.get(fold(k)) ?? 0) + s);
 
+  const labelOf = (key: string) =>
+    key.startsWith("f:") ? (folderById.get(key.slice(2))?.name ?? "Folder") : (labels.get(key) ?? "Task");
+  const partsOf = (key: string) =>
+    key === "o"
+      ? // Other lists the folders/tasks folded into it.
+        [...totals].filter(([k]) => fold(k) === "o").map(([k, s]) => ({ label: labelOf(k), seconds: s }))
+      : [...(parts.get(key) ?? [])].map(([label, s]) => ({ label, seconds: s }));
+
   const entities: TimeEntity[] = [...folded]
     .map(([key, seconds]): TimeEntity => {
-      if (key === "u") return { key, label: "Unassigned", kind: "unassigned", slot: null, seconds };
-      if (key === "o") return { key, label: "Other", kind: "other", slot: null, seconds };
-      if (key.startsWith("f:")) {
-        return { key, label: folderById.get(key.slice(2))?.name ?? "Folder", kind: "folder", slot: slotOf.get(key) ?? null, seconds };
-      }
-      return { key, label: labels.get(key) ?? "Task", kind: "task", slot: slotOf.get(key) ?? null, seconds };
+      const p = partsOf(key).sort((a, b) => b.seconds - a.seconds);
+      if (key === "u") return { key, label: "Unsorted", kind: "unassigned", slot: null, seconds, parts: p };
+      if (key === "o") return { key, label: "Other", kind: "other", slot: null, seconds, parts: p };
+      // A folderless task is its own entity; "Focus sessions" under it would only repeat it.
+      const kind = key.startsWith("f:") ? "folder" : "task";
+      return { key, label: labelOf(key), kind, slot: slotOf.get(key) ?? null, seconds, parts: kind === "task" ? [] : p };
     })
     .sort((a, b) => {
-      // Named entities by time; Unassigned and Other always last.
+      // Named entities by time; Unsorted and Other always last.
       const rank = (e: TimeEntity) => (e.kind === "unassigned" || e.kind === "other" ? 1 : 0);
       return rank(a) - rank(b) || b.seconds - a.seconds;
     });

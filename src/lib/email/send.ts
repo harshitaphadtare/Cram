@@ -8,6 +8,8 @@ import "server-only";
  * - EMAIL_FROM     — e.g. "Cram <reminders@yourdomain.com>", on a domain verified in Resend.
  *   Without it, Resend's shared test sender is used, which only delivers to the address the
  *   Resend account was created with — fine for trying reminders on yourself, not for students.
+ * - EMAIL_DELIVER_TO — optional; delivers every email to this one address instead (e.g. the
+ *   Resend account's address, when it differs from your Cram account's email).
  */
 export async function sendEmail(email: {
   to: string;
@@ -38,7 +40,7 @@ export async function sendEmail(email: {
       },
       body: JSON.stringify({
         from: process.env.EMAIL_FROM || "Cram <onboarding@resend.dev>",
-        to: email.to,
+        to: process.env.EMAIL_DELIVER_TO || email.to,
         subject: email.subject,
         html: email.html,
         text: email.text,

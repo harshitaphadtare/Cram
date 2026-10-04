@@ -62,9 +62,9 @@ export function TimeBreakdownCard({ initial }: { initial: TimeBreakdown }) {
   const showLabel = (i: number) => range !== "month" || [0, 7, 14, 21, 28].includes(i);
 
   return (
-    <section className="cram-viz flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-muted-foreground">Where your time went</h2>
+    <section className="cram-viz rounded-xl border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
+        <h2 className="text-sm font-medium">Where your time went</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center">
             <button
@@ -108,7 +108,7 @@ export function TimeBreakdownCard({ initial }: { initial: TimeBreakdown }) {
         </div>
       </div>
 
-      <div className={cn("rounded-xl border bg-card p-5 transition-opacity", pending && "opacity-60")}>
+      <div className={cn("p-5 transition-opacity", pending && "opacity-60")}>
         {/* Headline */}
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-3xl font-semibold">{formatDuration(total)}</span>
@@ -214,36 +214,50 @@ export function TimeBreakdownCard({ initial }: { initial: TimeBreakdown }) {
 
         {/* Breakdown: legend + table view in one */}
         {entities.length > 0 && (
-          <ul className="mt-6 flex flex-col gap-2.5 border-t pt-5">
+          <ul className="mt-6 flex flex-col gap-4 border-t pt-5">
             {entities.map((e) => (
-              <li key={e.key} className="grid grid-cols-[minmax(0,1fr)_minmax(4rem,30%)_auto] items-center gap-4 text-sm">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: colorOf(e) }} />
-                  <span className="truncate">{e.label}</span>
-                  {e.kind === "task" && (
-                    <span className="shrink-0 rounded bg-muted px-1.5 py-px text-[0.6875rem] text-muted-foreground">Task</span>
-                  )}
-                </span>
-                <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <span
-                    className="block h-full rounded-full"
-                    style={{ width: `${(e.seconds / topSeconds) * 100}%`, background: colorOf(e) }}
-                  />
-                </span>
-                <span className="flex items-baseline justify-end gap-2 text-right">
-                  <span className="font-medium tabular-nums">{formatDuration(e.seconds)}</span>
-                  <span className="w-9 text-xs text-muted-foreground tabular-nums">
-                    {Math.round((e.seconds / Math.max(1, total)) * 100)}%
+              <li key={e.key} className="flex flex-col gap-1.5">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(4rem,30%)_auto] items-center gap-4 text-sm">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: colorOf(e) }} />
+                    <span className="truncate font-medium">{e.label}</span>
+                    {e.kind === "task" && (
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-px text-[0.6875rem] text-muted-foreground">
+                        Task · no folder
+                      </span>
+                    )}
                   </span>
-                </span>
+                  <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${(e.seconds / topSeconds) * 100}%`, background: colorOf(e) }}
+                    />
+                  </span>
+                  <span className="flex items-baseline justify-end gap-2 text-right">
+                    <span className="font-medium tabular-nums">{formatDuration(e.seconds)}</span>
+                    <span className="w-9 text-xs text-muted-foreground tabular-nums">
+                      {Math.round((e.seconds / Math.max(1, total)) * 100)}%
+                    </span>
+                  </span>
+                </div>
+                {/* What it was spent on: tasks worked on in focus sessions, and writing notes. */}
+                {e.parts.length > 0 && (
+                  <ul className="ml-[5px] flex flex-col gap-1 border-l pl-4">
+                    {e.parts.map((p) => (
+                      <li key={p.label} className="flex items-baseline justify-between gap-4 text-xs">
+                        <span className="truncate text-muted-foreground">{p.label}</span>
+                        <span className="shrink-0 text-muted-foreground tabular-nums">{formatDuration(p.seconds)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
         )}
-        {byKey.has("u") && (
+        {byKey.get("u")?.parts.some((p) => p.label === "Focus with no task") && (
           <p className="mt-4 text-xs text-muted-foreground">
-            Unassigned is focus time with no task picked, and note-writing from before time was tracked per folder.
-            Link a task in Pomodoro to sort your focus time.
+            Tip: pick a task in Pomodoro so your focus time lands in the right folder.
           </p>
         )}
       </div>

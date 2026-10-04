@@ -663,7 +663,7 @@ svg.cram-lightbox-content {
 
 /* Chart colours (Progress → "Where your time went"). Validated categorical palette, in a fixed
    order: folders/tasks keep their slot in every range. Dark steps are their own, validated against
-   the dark card. Unassigned/Other are neutral greys. */
+   the dark card. Unsorted/Other are neutral greys. */
 .cram-viz {
   --viz-1: #2a78d6;
   --viz-2: #eb6834;

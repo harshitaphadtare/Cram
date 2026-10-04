@@ -430,16 +430,93 @@
   white-space: pre-wrap;
 }
 
-/* Code blocks: a soft panel a step lighter than the page (dark) or a light gray (light), with a
-   hairline border — BlockNote's default is near-black in both themes and blends into a dark page. */
+/* Code blocks, Notion-style: a flat panel (warm off-white in light mode, a faint lift in dark),
+   no border, small radius; code in a monospace face (90% of the 14px base reads like Notion's) with roomy padding. BlockNote's default
+   is near-black in both themes and blends into a dark page. */
 .bn-container .bn-block-content[data-content-type="codeBlock"] {
-  background-color: color-mix(in oklab, var(--foreground) 6%, var(--background));
+  position: relative;
+  background-color: rgb(255 255 255 / 0.035);
   color: var(--foreground);
-  border: 1px solid color-mix(in oklab, var(--foreground) 12%, transparent);
-  border-radius: 10px;
+  border: none;
+  border-radius: 4px;
 }
 :root:not(.dark) .bn-container .bn-block-content[data-content-type="codeBlock"] {
-  background-color: color-mix(in oklab, var(--foreground) 4%, var(--background));
+  background-color: rgb(247 246 243);
+}
+.bn-container .bn-block-content[data-content-type="codeBlock"] > pre,
+.bn-container .bn-block-content[data-content-type="codeBlock"] > pre code {
+  font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  tab-size: 2;
+}
+
+/* "Copy", top-right, on hover (lib/code-block.ts). */
+.cram-code-actions {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.5rem;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.bn-block-content[data-content-type="codeBlock"]:hover .cram-code-actions,
+.cram-code-actions:focus-within,
+.cram-code-actions:has(.cram-code-copy[data-copied="true"]) {
+  opacity: 1;
+}
+.cram-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--foreground) 6%, var(--background));
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+}
+.cram-code-copy:hover {
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--foreground) 11%, var(--background));
+}
+.cram-code-copy[data-copied="true"] {
+  color: var(--foreground);
+}
+
+/* Image upload placeholder: a quiet shimmering panel instead of a bare "Loading...". */
+.bn-container .bn-file-loading-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 6rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--foreground) 4%, transparent) 25%,
+    color-mix(in oklab, var(--foreground) 8%, transparent) 50%,
+    color-mix(in oklab, var(--foreground) 4%, transparent) 75%
+  );
+  background-size: 200% 100%;
+  animation: cram-shimmer 1.4s linear infinite;
+}
+@keyframes cram-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bn-container .bn-file-loading-preview {
+    animation: none;
+  }
 }
 /* Syntax colours: Shiki gives every token a light and a dark colour; BlockNote always picks dark
    because its code background is always dark. Match the app theme instead. */
@@ -451,16 +528,17 @@
 .bn-editor .bn-block:has(> .cram-mermaid-block) {
   padding-block: 0.625rem;
 }
+/* Notion's code padding: 34px 16px 32px 32px (the top leaves room for the language label). */
 .bn-container .bn-block-content[data-content-type="codeBlock"] > pre {
-  padding: 2.25rem 1.25rem 1.125rem;
+  padding: 2.125rem 1rem 2rem 2rem;
 }
 
 /* Language picker (lib/code-block-language-menu.ts): a quiet label top-left, clearer on hover. */
 .bn-container .bn-block-content[data-content-type="codeBlock"] > .cram-lang-slot,
 .cram-mermaid-block .cram-lang-slot {
   position: absolute;
-  top: 0.5rem;
-  left: 0.75rem;
+  top: 0.375rem;
+  left: 0.5rem;
   z-index: 1;
 }
 .cram-lang-button {

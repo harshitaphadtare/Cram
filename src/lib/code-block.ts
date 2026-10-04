@@ -54,6 +54,13 @@ export function enhanceCodeBlock(spec: CodeBlockSpec, languages: LanguageList): 
             ? attachMermaidPreview(block, base.dom, base.contentDOM)
             : null;
 
+        // Code isn't prose: no red spell-check squiggles under identifiers (Notion does the same).
+        base.contentDOM?.setAttribute("spellcheck", "false");
+
+        // Notion's "Copy" button: top-right, shown on hover (works in read-only pages too).
+        const copy = mermaid ? null : createCopyButton(() => base.contentDOM?.textContent ?? "");
+        if (copy) base.dom.appendChild(copy.el);
+
         return {
           ...base,
           dom: mermaid?.dom ?? base.dom,
@@ -61,10 +68,12 @@ export function enhanceCodeBlock(spec: CodeBlockSpec, languages: LanguageList): 
           // mistake that for an edit, or it rebuilds the block and throws the UI away mid-use.
           ignoreMutation: (m: MutationRecord | { type: "selection"; target: Node }) =>
             menu.button.contains(m.target) ||
+            (copy?.el.contains(m.target) ?? false) ||
             (mermaid?.isOwnUi(m) ?? false) ||
             (base.ignoreMutation?.(m) ?? false),
           destroy: () => {
             menu.destroy();
+            copy?.destroy();
             mermaid?.destroy();
             base.destroy?.();
           },
@@ -72,6 +81,55 @@ export function enhanceCodeBlock(spec: CodeBlockSpec, languages: LanguageList): 
       },
     },
   };
+}
+
+const COPY_ICON =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const CHECK_ICON =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+/** A "Copy" button for a code block; shows "Copied" for a moment after a click. */
+function createCopyButton(getText: () => string) {
+  const el = document.createElement("div");
+  el.className = "cram-code-actions";
+  el.contentEditable = "false";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "cram-code-copy";
+  const show = (copied: boolean) => {
+    button.innerHTML = `${copied ? CHECK_ICON : COPY_ICON}<span>${copied ? "Copied" : "Copy"}</span>`;
+    button.dataset.copied = String(copied);
+  };
+  show(false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // mousedown would move the editor's cursor into the block; keep focus where it is.
+  button.addEventListener("mousedown", (e) => e.preventDefault());
+  button.addEventListener("click", () => {
+    const text = getText();
+    const done = () => {
+      show(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => show(false), 1500);
+    };
+    // The async clipboard API can be refused (no permission, embedded views); fall back to a
+    // hidden textarea + execCommand, which still works there.
+    navigator.clipboard
+      .writeText(text)
+      .then(done)
+      .catch(() => {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.setAttribute("readonly", "");
+        area.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+        document.body.appendChild(area);
+        area.select();
+        const ok = document.execCommand("copy");
+        area.remove();
+        if (ok) done();
+      });
+  });
+  el.appendChild(button);
+  return { el, destroy: () => clearTimeout(timer) };
 }
 
 interface CodeBlockLike {

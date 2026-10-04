@@ -181,18 +181,28 @@ export async function creditActivity(
 /**
  * Credits active note-editing time. Autosaves arrive every few seconds while typing; the gap since
  * the previous save counts as study time if it's short enough to be the same writing session.
+ * The time is also recorded against the page's folder, for Progress → "Where your time went".
  */
-export async function creditNoteEditing(userId: string): Promise<void> {
+export async function creditNoteEditing(userId: string, folderId: string): Promise<void> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { lastEditAt: true },
+    select: { lastEditAt: true, timezone: true },
   });
   const now = new Date();
   await prisma.user.update({ where: { id: userId }, data: { lastEditAt: now } });
 
   const gap = user.lastEditAt ? now.getTime() - user.lastEditAt.getTime() : Infinity;
   if (gap <= EDIT_SESSION_GAP_MS) {
-    await creditActivity(userId, { seconds: gap / 1000 });
+    const seconds = Math.round(gap / 1000);
+    const date = userToday(user.timezone);
+    await Promise.all([
+      creditActivity(userId, { seconds: gap / 1000 }),
+      prisma.folderStudyTime.upsert({
+        where: { userId_folderId_date: { userId, folderId, date } },
+        update: { seconds: { increment: seconds } },
+        create: { userId, folderId, date, seconds },
+      }),
+    ]);
   }
 }
 

@@ -68,6 +68,10 @@ sections so you see what a new student sees. Tick each box as you go.
 - [ ] The goal ring fills; hitting the goal gives +20 XP once.
 - [ ] Settings → **Custom** goal (e.g. 4 hours) shows as "of 4 hours" on Home.
 - [ ] Achievements unlock with a confetti toast; the Progress page lists them and the heatmap fills.
+- [ ] Progress → **Where your time went**: a focus session on a task in a folder adds to that
+      folder; on a task with no folder, shows the task's name; writing notes adds to the page's
+      folder. Week / Month / Year and the ‹ › arrows switch periods; hovering a column shows its
+      breakdown; the total matches the day's minutes elsewhere.
 - [ ] Settings → **Reset progress** (type RESET): streak, XP, level, achievements and the heatmap
       go to zero; notes, folders, tasks and quiz history remain; old quizzes don't re-unlock badges.
 - [ ] Skip a day (or wait) → a streak freeze covers it (❄ on the week strip).

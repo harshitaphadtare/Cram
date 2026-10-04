@@ -33,6 +33,7 @@ export async function resetProgress() {
   await prisma.$transaction([
     prisma.streakLog.deleteMany({ where: { userId: user.id } }),
     prisma.userAchievement.deleteMany({ where: { userId: user.id } }),
+    prisma.folderStudyTime.deleteMany({ where: { userId: user.id } }),
     prisma.user.update({
       where: { id: user.id },
       data: {

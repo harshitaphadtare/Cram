@@ -660,3 +660,31 @@ svg.cram-lightbox-content {
 .cram-mermaid svg {
   cursor: zoom-in;
 }
+
+/* Chart colours (Progress → "Where your time went"). Validated categorical palette, in a fixed
+   order: folders/tasks keep their slot in every range. Dark steps are their own, validated against
+   the dark card. Unassigned/Other are neutral greys. */
+.cram-viz {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #4a3aa7;
+  --viz-8: #e34948;
+  --viz-unassigned: #a3a29d;
+  --viz-other: #cfcec9;
+}
+.dark .cram-viz {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+  --viz-7: #9085e9;
+  --viz-8: #e66767;
+  --viz-unassigned: #6f6e6a;
+  --viz-other: #4d4c49;
+}

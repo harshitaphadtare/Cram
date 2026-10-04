@@ -66,7 +66,7 @@ export async function updatePageContent(pageId: string, content: Prisma.InputJso
   });
 
   // Writing notes is studying: active editing time counts toward the goal, XP and streak.
-  await creditNoteEditing(user.id);
+  await creditNoteEditing(user.id, page.folderId);
 
   // Keep this page's question bank in step with its notes (throttled; after the response).
   after(() => refreshPageBank(pageId));

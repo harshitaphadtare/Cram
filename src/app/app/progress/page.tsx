@@ -7,6 +7,8 @@ import { levelInfo } from "@/lib/levels";
 import { AchievementBadge } from "@/components/gamification/achievement-badge";
 import { LevelProgress } from "@/components/gamification/level-progress";
 import { cn } from "@/lib/utils";
+import { getTimeBreakdown } from "@/lib/data/time-breakdown";
+import { TimeBreakdownCard } from "@/components/gamification/time-breakdown";
 
 const WEEKS = 12;
 
@@ -31,10 +33,11 @@ export default async function ProgressPage() {
   const weekday = (today.getUTCDay() + 6) % 7;
   const start = addDays(today, -weekday - (WEEKS - 1) * 7);
 
-  const [stats, unlocked, logs] = await Promise.all([
+  const [stats, unlocked, logs, timeBreakdown] = await Promise.all([
     getAchievementStats(user.id),
     prisma.userAchievement.findMany({ where: { userId: user.id }, select: { key: true, unlockedAt: true } }),
     prisma.streakLog.findMany({ where: { userId: user.id, date: { gte: start } } }),
+    getTimeBreakdown(user, "week", 0),
   ]);
 
   const unlockedAt = new Map(unlocked.map((u) => [u.key, u.unlockedAt]));
@@ -98,6 +101,8 @@ export default async function ProgressPage() {
           </div>
         ))}
       </section>
+
+      <TimeBreakdownCard initial={timeBreakdown} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-muted-foreground">Last {WEEKS} weeks</h2>

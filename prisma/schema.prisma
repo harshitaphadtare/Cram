@@ -76,17 +76,18 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  ownedFolders  Folder[]          @relation("FolderOwner")
-  folderMembers FolderMember[]
-  quizzes       Quiz[]
-  tasks         Task[]
-  pomodoros     PomodoroSession[]
-  streakLogs    StreakLog[]
-  sentInvites   FolderMember[]    @relation("InvitedBy")
-  achievements  UserAchievement[]
-  pageReviews   PageReview[]
-  roadmapItems  RoadmapItem[]
-  emailLogs     EmailLog[]
+  ownedFolders    Folder[]          @relation("FolderOwner")
+  folderMembers   FolderMember[]
+  quizzes         Quiz[]
+  tasks           Task[]
+  pomodoros       PomodoroSession[]
+  streakLogs      StreakLog[]
+  sentInvites     FolderMember[]    @relation("InvitedBy")
+  achievements    UserAchievement[]
+  pageReviews     PageReview[]
+  roadmapItems    RoadmapItem[]
+  emailLogs       EmailLog[]
+  folderStudyTime FolderStudyTime[]
 
   @@map("users")
 }
@@ -118,11 +119,12 @@ model Folder {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members FolderMember[]
-  pages   Page[]
-  quizzes Quiz[]
-  tasks   Task[]
-  roadmap RoadmapItem[]
+  members   FolderMember[]
+  pages     Page[]
+  quizzes   Quiz[]
+  tasks     Task[]
+  roadmap   RoadmapItem[]
+  studyTime FolderStudyTime[]
 
   @@index([ownerId])
   @@map("folders")
@@ -364,4 +366,20 @@ model RoadmapItem {
 
   @@index([userId, folderId])
   @@map("roadmap_items")
+}
+
+/// Note-writing time per folder per day (the user's local date), for Progress → "Where your time
+/// went". Focus time comes from PomodoroSession (task → folder); this covers writing notes.
+model FolderStudyTime {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId String
+  folder   Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  date     DateTime @db.Date
+  seconds  Int      @default(0)
+
+  @@unique([userId, folderId, date])
+  @@index([userId, date])
+  @@map("folder_study_time")
 }

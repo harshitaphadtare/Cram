@@ -63,6 +63,13 @@ model User {
   onboardedAt       DateTime?
   /// Set by "Reset progress": XP, streaks and achievements only count activity after this.
   progressResetAt   DateTime?
+  /// Email preferences (Settings → Email). Every reminder email links to turn its kind off.
+  /// Streak-at-risk and "come back" nudges.
+  emailReminders    Boolean   @default(true)
+  /// Morning plan: pages due for review and tasks due today.
+  emailPlan         Boolean   @default(true)
+  /// Sunday evening recap of the week.
+  emailWeekly       Boolean   @default(true)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -76,8 +83,26 @@ model User {
   achievements  UserAchievement[]
   pageReviews   PageReview[]
   roadmapItems  RoadmapItem[]
+  emailLogs     EmailLog[]
 
   @@map("users")
+}
+
+/// One row per reminder email sent, so the hourly job never sends the same email twice and can
+/// space repeats out (e.g. a review nudge at most every other day).
+model EmailLog {
+  id     String   @id @default(cuid())
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// streak_risk | plan | comeback | weekly
+  kind   String
+  /// The user's local date it was sent for (YYYY-MM-DD).
+  day    String
+  sentAt DateTime @default(now())
+
+  @@unique([userId, kind, day])
+  @@index([userId, kind, sentAt])
+  @@map("email_logs")
 }
 
 model Folder {

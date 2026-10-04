@@ -38,6 +38,24 @@ export async function updateFolderColor(folderId: string, color: string) {
   revalidatePath("/app", "layout");
 }
 
+/** Saves the user's own sidebar order of folders (drag and drop). Doesn't affect anyone else. */
+export async function reorderFolders(orderedFolderIds: string[]) {
+  const user = await requireUser();
+  if (!Array.isArray(orderedFolderIds) || orderedFolderIds.some((id) => typeof id !== "string")) {
+    throw new Error("Invalid folder order.");
+  }
+  // Keep only folders this user can actually see, once each.
+  const visible = await prisma.folder.findMany({
+    where: { id: { in: orderedFolderIds }, OR: [{ ownerId: user.id }, { members: { some: { userId: user.id } } }] },
+    select: { id: true },
+  });
+  const allowed = new Set(visible.map((f) => f.id));
+  const folderOrder = [...new Set(orderedFolderIds)].filter((id) => allowed.has(id));
+
+  await prisma.user.update({ where: { id: user.id }, data: { folderOrder } });
+  revalidatePath("/app", "layout");
+}
+
 export async function deleteFolder(folderId: string) {
   const user = await requireUser();
   await requireFolderRole(folderId, user.id, FolderRole.OWNER);

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { toast } from "sonner";
 import {
   CalendarCheck2,
   History,
@@ -27,7 +29,8 @@ import { NavUser } from "@/components/nav-user";
 import { CramLogo } from "@/components/cram-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NewFolderDialog } from "@/components/new-folder-dialog";
-import { SidebarFolderItem } from "@/components/sidebar-folder-item";
+import { SidebarFolderItem, type FolderDropPosition } from "@/components/sidebar-folder-item";
+import { reorderFolders } from "@/app/actions/folders";
 import { SearchTrigger } from "@/components/command-palette";
 import type { VisibleFolder } from "@/lib/data/folders";
 
@@ -47,6 +50,33 @@ export function AppSidebar({
   user: { name: string | null; email: string; avatarUrl: string | null };
 }) {
   const pathname = usePathname();
+
+  // Folder order, changed optimistically on drop and saved in the background. Resets to the
+  // server's order whenever the set of folders changes (one added, deleted or shared).
+  const serverIds = folders.map((f) => f.id);
+  const serverKey = serverIds.join(",");
+  const [order, setOrder] = useState(serverIds);
+  const [lastServerKey, setLastServerKey] = useState(serverKey);
+  if (serverKey !== lastServerKey) {
+    setLastServerKey(serverKey);
+    setOrder(serverIds);
+  }
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  const orderedFolders = order.map((id) => byId.get(id)).filter((f): f is VisibleFolder => !!f);
+
+  function reorder(draggedId: string, targetId: string, pos: FolderDropPosition) {
+    const next = order.filter((id) => id !== draggedId);
+    const at = next.indexOf(targetId);
+    if (at === -1) return;
+    next.splice(pos === "before" ? at : at + 1, 0, draggedId);
+    if (next.join(",") === order.join(",")) return;
+    const previous = order;
+    setOrder(next);
+    reorderFolders(next).catch(() => {
+      setOrder(previous);
+      toast.error("Couldn't save the new folder order.");
+    });
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -106,8 +136,8 @@ export function AppSidebar({
                   No folders yet — create one to get started.
                 </p>
               )}
-              {folders.map((folder) => (
-                <SidebarFolderItem key={folder.id} folder={folder} />
+              {orderedFolders.map((folder) => (
+                <SidebarFolderItem key={folder.id} folder={folder} onReorder={reorder} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>

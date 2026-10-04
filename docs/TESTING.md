@@ -31,6 +31,9 @@ sections so you see what a new student sees. Tick each box as you go.
 - [ ] `⋯` next to the title: **Full width**, **Small text** (persist after reload), **Copy link**.
 - [ ] Heading outline dashes appear on the right for pages with 2+ headings; hover → click jumps.
 - [ ] Sidebar folder expands to show pages; `+` on hover creates a page.
+- [ ] Drag a folder up or down in the sidebar: a blue line shows where it lands, the order survives
+      a reload, and Home's folder list uses the same order. Another account sharing that folder
+      keeps its own order.
 - [ ] Breadcrumb hover menus list sections / folders / pages.
 - [ ] **Tabs**: `+` opens a tab; Ctrl+click a sidebar link opens a background tab; close works.
 - [ ] **Ctrl+K** finds pages by title and by words inside the page.

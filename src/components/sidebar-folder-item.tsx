@@ -25,11 +25,26 @@ import {
 import { movePage, placePage } from "@/app/actions/pages";
 import { PageIcon } from "@/components/page-icon";
 
+/** Folders are dragged by their row to reorder the sidebar (pages use PAGE_DRAG_TYPE). */
+const FOLDER_DRAG_TYPE = "application/x-cram-folder";
+// Which folder is being dragged: dragover can't read DataTransfer contents, only its types.
+let draggingFolderId: string | null = null;
+
+export type FolderDropPosition = "before" | "after";
+
 /**
  * A folder row that expands in place to list its pages (Notion's page tree). Hovering the row swaps
- * the colour dot for a disclosure chevron; the folder you're inside opens automatically.
+ * the colour dot for a disclosure chevron; the folder you're inside opens automatically. Drag the
+ * row up or down to reorder folders.
  */
-export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
+export function SidebarFolderItem({
+  folder,
+  onReorder,
+}: {
+  folder: VisibleFolder;
+  onReorder?: (draggedId: string, targetId: string, pos: FolderDropPosition) => void;
+}) {
+  const [folderPos, setFolderPos] = useState<FolderDropPosition | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const href = `/app/folders/${folder.id}`;
@@ -68,19 +83,50 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
         render={
           <Link
             href={href}
-            draggable={false}
-            // Dropping a sub-page on its subject moves it back to the top level.
+            draggable={!!onReorder}
+            onDragStart={(e) => {
+              draggingFolderId = folder.id;
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData(FOLDER_DRAG_TYPE, folder.id);
+              // Replace the browser's default link drag (it would drag the folder's URL).
+              e.dataTransfer.setData("text/plain", folder.name);
+            }}
+            onDragEnd={() => {
+              draggingFolderId = null;
+              setFolderPos(null);
+            }}
             onDragOver={(e) => {
+              // Another folder: drop above or below this one, by which half of the row you're over.
+              if (e.dataTransfer.types.includes(FOLDER_DRAG_TYPE)) {
+                if (!draggingFolderId || draggingFolderId === folder.id) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const rect = e.currentTarget.getBoundingClientRect();
+                setFolderPos(e.clientY < rect.top + rect.height / 2 ? "before" : "after");
+                return;
+              }
+              // Dropping a sub-page on its subject moves it back to the top level.
               const drag = getPageDrag();
               if (!e.dataTransfer.types.includes(PAGE_DRAG_TYPE) || drag?.folderId !== folder.id || !drag.parentId) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
               setFolderDrop(true);
             }}
-            onDragLeave={() => setFolderDrop(false)}
+            onDragLeave={() => {
+              setFolderDrop(false);
+              setFolderPos(null);
+            }}
             onDrop={(e) => {
               e.preventDefault();
               setFolderDrop(false);
+              if (e.dataTransfer.types.includes(FOLDER_DRAG_TYPE)) {
+                const dragged = draggingFolderId;
+                const pos = folderPos;
+                draggingFolderId = null;
+                setFolderPos(null);
+                if (dragged && pos && dragged !== folder.id) onReorder?.(dragged, folder.id, pos);
+                return;
+              }
               const drag = getPageDrag();
               if (drag?.folderId === folder.id && drag.parentId) dropPage(null, "inside", folder.pages);
             }}
@@ -92,6 +138,17 @@ export function SidebarFolderItem({ folder }: { folder: VisibleFolder }) {
           </Link>
         }
       />
+
+      {/* Where a dragged folder will land: above this row, or below it (and its open pages). */}
+      {folderPos && (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute right-1 left-1 z-10 h-0.5 rounded-full bg-primary",
+            folderPos === "before" ? "-top-px" : "-bottom-px",
+          )}
+        />
+      )}
 
       {/* Dot ⇄ chevron, sitting over the row's left padding (a sibling, not inside the link). */}
       <button

@@ -30,10 +30,21 @@ export async function POST(request: Request) {
 
   const ext = file.name.split(".").pop() ?? "bin";
   const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+  const bytes = await file.arrayBuffer();
 
-  const { error } = await admin.storage
-    .from(BUCKET)
-    .upload(path, await file.arrayBuffer(), { contentType: file.type });
+  let { error } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: file.type });
+  // A new Supabase project doesn't have the bucket yet: create it once, then retry.
+  if (error && /bucket not found/i.test(error.message)) {
+    const created = await admin.storage.createBucket(BUCKET, {
+      public: true,
+      fileSizeLimit: MAX_BYTES,
+      allowedMimeTypes: [...ALLOWED_TYPES],
+    });
+    if (created.error && !/already exists/i.test(created.error.message)) {
+      return NextResponse.json({ error: created.error.message }, { status: 500 });
+    }
+    ({ error } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: file.type }));
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

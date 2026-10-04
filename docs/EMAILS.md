@@ -104,24 +104,35 @@ Locally, `npm run dev` and open `/api/email/preview?kind=plan` (or `weekly`, `co
 ## Schedule the hourly run (Supabase pg_cron)
 
 Vercel's free plan only allows cron jobs once a day, so the hourly call comes from Supabase
-(free). In Supabase → **SQL Editor**, run this with your real `CRON_SECRET`:
+(free). The secret is kept in **Supabase Vault** (encrypted), so it never appears in the job's
+text or the cron jobs page. In Supabase → **SQL Editor**:
 
 ```sql
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
+-- 1. Store CRON_SECRET in Vault (paste the real value once; it's encrypted from then on).
+select vault.create_secret('YOUR_CRON_SECRET', 'cram_cron_secret', 'Bearer token for the hourly reminder job');
+
+-- 2. Schedule the job; it reads the secret from Vault each time it runs.
 select cron.schedule(
   'cram-reminder-emails',
   '0 * * * *',  -- at the top of every hour
   $$
   select net.http_get(
     url := 'https://cram-eta.vercel.app/api/cron/emails',
-    headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'),
+    headers := jsonb_build_object(
+      'Authorization',
+      'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'cram_cron_secret')
+    ),
     timeout_milliseconds := 60000
   );
   $$
 );
 ```
+
+If you ever change `CRON_SECRET`, update Vault to match:
+`select vault.update_secret((select id from vault.secrets where name = 'cram_cron_secret'), 'NEW_SECRET');`
 
 Check it's running: `select * from cron.job_run_details order by start_time desc limit 5;` and the
 responses: `select status_code, content from net._http_response order by created desc limit 5;`.

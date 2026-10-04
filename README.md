@@ -50,7 +50,8 @@ focus timer, and a gamified streak/XP system designed to bring you back every da
   zero, behind a type-RESET confirmation. Notes, folders, tasks and quiz history are kept.
 - **Reminder emails** in the student's timezone: a morning plan (reviews and tasks due), a
   streak-at-risk nudge at 8 pm, comeback nudges after a few days away, and a Sunday recap. Each
-  can be turned off in Settings or from the email itself.
+  can be turned off in Settings or from the email itself. *The live site sends these to the owner's
+  account only: emailing every student needs a paid domain (see [docs/EMAILS.md](docs/EMAILS.md)).*
 
 | Action | XP |
 | --- | --- |

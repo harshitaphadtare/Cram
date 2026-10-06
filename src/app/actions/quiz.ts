@@ -13,7 +13,10 @@ import { after } from "next/server";
 import type { GeneratedQuizQuestion } from "@/lib/gemini";
 import {
   contentHash,
+  countUnseen,
   drawFromBank,
+  loadQuizHistory,
+  questionKey,
   markBankQuestionsUsed,
   refreshStaleBanks,
   saveLiveQuestionsToBank,
@@ -63,13 +66,25 @@ async function createQuiz(input: {
   const withContent = sourcePages.filter((p) => p.content.trim());
   const hashes = new Map(withContent.map((p) => [p.id, contentHash(p.content)]));
 
-  // 1. Questions written ahead of time for these exact page versions (instant, no AI call).
-  const banked = await drawFromBank({ hashes, difficulty: input.difficulty, count: questionCount });
+  // What this user has already been asked from these pages. Questions they got right don't come
+  // back; ones they got wrong do, as review.
+  const history = await loadQuizHistory(user.id, [...hashes.keys()]);
 
-  // 2. Write the shortfall live (then keep it in the bank for next time).
+  // 1. Review: up to a quarter of the quiz re-asks questions they last got wrong, with the options
+  //    reshuffled so the answer's position can't be memorised.
+  const review = shuffle(history.missed)
+    .slice(0, Math.floor(questionCount / 4))
+    .map((q) => ({ ...q, options: shuffle(q.options) }));
+  const freshCount = questionCount - review.length;
+
+  // 2. Banked questions they haven't seen, for these exact page versions (instant, no AI call).
+  const banked = await drawFromBank({ hashes, difficulty: input.difficulty, count: freshCount, seen: history.seen });
+
+  // 3. Write the shortfall live, telling the AI what's been asked so it moves on to untested parts
+  //    of the notes, or new question formats once they're covered.
   let live: GeneratedQuizQuestion[] = [];
   let liveError: unknown = null;
-  const missing = questionCount - banked.length;
+  const missing = freshCount - banked.length;
   if (missing > 0) {
     // Pages with the fewest banked questions first — that's where the gap is.
     const bankedPerPage = new Map<string, number>();
@@ -80,29 +95,36 @@ async function createQuiz(input: {
         pages: banked.length > 0 ? needy.slice(0, Math.max(1, Math.ceil(needy.length / 2))) : withContent,
         difficulty: input.difficulty,
         count: Math.max(3, missing),
+        avoid: history.asked,
         // With some banked questions in hand, don't keep the user waiting as long for the rest.
         geminiDeadlineMs: banked.length > 0 ? 20_000 : undefined,
       });
+      // The AI sometimes repeats one anyway.
+      live = live.filter((q) => !history.seen.has(questionKey(q.questionText)));
     } catch (err) {
       liveError = err;
     }
   }
 
-  // 3. Outage fallback: older banked questions (earlier page versions / other difficulties).
+  // 4. Outage fallback: older banked questions (earlier page versions / other difficulties, unseen
+  //    first), then any remaining missed questions.
   let fallback: Awaited<ReturnType<typeof drawFromBank>> = [];
-  if (banked.length + live.length < questionCount) {
+  const freshSoFar = banked.length + Math.min(live.length, missing);
+  if (freshSoFar < freshCount) {
     fallback = await drawFromBank({
       hashes,
       difficulty: input.difficulty,
-      count: questionCount - banked.length - live.length,
+      count: freshCount - freshSoFar,
       fallback: true,
       exclude: new Set(banked.map((q) => q.bankId)),
+      seen: history.seen,
     });
   }
 
   const generated = shuffle([
+    ...review,
     ...banked,
-    ...live.slice(0, questionCount - banked.length),
+    ...live.slice(0, Math.max(0, missing)),
     ...fallback,
   ]).slice(0, questionCount);
 
@@ -115,6 +137,23 @@ async function createQuiz(input: {
   after(async () => {
     await markBankQuestionsUsed(usedBankIds);
     if (live.length > 0) await saveLiveQuestionsToBank(live, input.difficulty, hashes);
+    // Write the next quiz's questions now if this user is running out of unseen ones, so it starts
+    // instantly instead of waiting on the AI.
+    try {
+      const seenNow = new Set([...history.seen, ...generated.map((q) => questionKey(q.questionText))]);
+      if ((await countUnseen(hashes, input.difficulty, seenNow)) < questionCount) {
+        const ahead = await generateQuizQuestions({
+          pages: withContent,
+          difficulty: input.difficulty,
+          count: questionCount,
+          avoid: [...generated.map((q) => q.questionText), ...history.asked],
+        });
+        const fresh = ahead.filter((q) => !seenNow.has(questionKey(q.questionText)));
+        await saveLiveQuestionsToBank(fresh, input.difficulty, hashes, { used: false });
+      }
+    } catch (err) {
+      console.warn("Writing next quiz's questions skipped:", err instanceof Error ? err.message : err);
+    }
     // Top up banks that are missing or out of date, for next time.
     await refreshStaleBanks([...hashes.keys()], 2);
   });

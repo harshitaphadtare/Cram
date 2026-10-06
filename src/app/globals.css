@@ -229,6 +229,19 @@
   --level: 1.25em !important;
   padding-top: 1rem !important;
 }
+/* Levels 4-6 step on down from H3 (the base rule above is H1-sized, so each needs its own size). */
+.bn-editor [data-content-type="heading"][data-level="4"] {
+  --level: 1.125em !important;
+  padding-top: 0.75rem !important;
+}
+.bn-editor [data-content-type="heading"][data-level="5"] {
+  --level: 1em !important;
+  padding-top: 0.75rem !important;
+}
+.bn-editor [data-content-type="heading"][data-level="6"] {
+  --level: 0.875em !important;
+  padding-top: 0.75rem !important;
+}
 .bn-editor [data-prev-level="1"] {
   --prev-level: 1.875em !important;
 }
@@ -237,6 +250,15 @@
 }
 .bn-editor [data-prev-level="3"] {
   --prev-level: 1.25em !important;
+}
+.bn-editor [data-prev-level="4"] {
+  --prev-level: 1.125em !important;
+}
+.bn-editor [data-prev-level="5"] {
+  --prev-level: 1em !important;
+}
+.bn-editor [data-prev-level="6"] {
+  --prev-level: 0.875em !important;
 }
 /* The first block sits right under the page title — no extra gap on top of the title's own. */
 .bn-editor > .bn-block-group > .bn-block-outer:first-child [data-content-type="heading"] {

@@ -119,13 +119,13 @@ function quizJsonSchema(withDifficulty = false) {
 const DIFFICULTY_GUIDANCE: Record<Difficulty, string> = {
   EASY: "Test recall of basic definitions and facts explicitly stated in the notes. Keep wording simple and direct.",
   MEDIUM: "Test understanding and application of concepts, not just memorization. Include some questions that require connecting two ideas from the notes.",
-  HARD: "Test deep understanding, edge cases, and the ability to apply concepts to new scenarios not literally spelled out in the notes. Include tricky distractors.",
+  HARD: "Test deep understanding, edge cases, and the ability to apply concepts from the notes to new scenarios. Include tricky distractors.",
 };
 
 const QUESTION_RULES = `Rules:
 - Each question must have exactly 4 options.
 - Exactly one option must be correct, and "correctAnswer" must match that option string exactly.
-- Do not invent facts that aren't supported by the notes.
+- Stay strictly inside the notes. Every term, concept and fact a question needs — in the question, the correct answer and the explanation — must appear in the notes. Never bring in outside topics, acronyms or terms the notes don't use (if the notes never mention "SLO", don't ask about SLOs), even if they're closely related. A scenario can be new, but working out its answer must only need what the notes teach. If the notes run out, ask about the same material in a different way rather than going beyond them.
 - Vary question phrasing and avoid trivially guessable options.
 - Ask direct conceptual questions about the subject itself, as a textbook or exam would. Never refer to the notes, the text, the page, the author or "the definition given" in a question, its options or its explanation — no "according to the notes", "the notes' definition", "as described above" or "what do you think". Bad: "Which core pillar of the notes' definition is violated?" Good: "Which principle of the CIA triad is violated when an attacker gains unauthorized access to data?"
 - Write a short explanation for each correct answer.`;
@@ -146,14 +146,35 @@ function buildNotes(pages: QuizSourcePage[], multiPage: boolean, maxChars: numbe
     .slice(0, maxChars);
 }
 
-function buildQuizPrompt(notes: string, difficulty: Difficulty, count: number, multiPage: boolean) {
+/** Questions the student has already been asked, newest first, trimmed to fit `maxChars`. */
+function buildAvoid(avoid: string[], maxChars: number) {
+  if (avoid.length === 0) return "";
+  const lines: string[] = [];
+  let used = 0;
+  for (const q of avoid) {
+    const line = `- ${q.length > 160 ? `${q.slice(0, 160)}…` : q}`;
+    if (used + line.length > maxChars) break;
+    lines.push(line);
+    used += line.length + 1;
+  }
+  return `
+ALREADY ASKED — the student has seen these before. Don't repeat them or ask about the same fact in the same way:
+${lines.join("\n")}
+
+Write NEW questions:
+1. First, test parts of the notes the questions above haven't covered yet.
+2. Where the notes are already well covered, test the same ideas in a fresh format rather than rewording an old question: a short real-world scenario, "Which statement is FALSE?", "What would happen if…", putting steps in the right order, spotting the mistake in a design, or comparing two concepts. Every question still has exactly 4 options and stays strictly inside the notes.
+`;
+}
+
+function buildQuizPrompt(notes: string, difficulty: Difficulty, count: number, multiPage: boolean, avoid = "") {
   return `You are a study quiz generator. Based ONLY on the study notes below, write exactly ${count} multiple-choice questions.
 
 Difficulty: ${difficulty}. ${DIFFICULTY_GUIDANCE[difficulty]}
 
 ${QUESTION_RULES}
 ${multiPage ? '- Set "sourcePageNumber" to the numbered page (1, 2, 3, ...) this question\'s content mainly came from.' : '- Set "sourcePageNumber" to 1.'}
-
+${avoid}
 STUDY NOTES:
 """
 ${notes}
@@ -253,21 +274,33 @@ function parseQuestions(text: string): RawQuestion[] {
   );
 }
 
-/** Writes a quiz live for the given pages. */
+/** Writes a quiz live for the given pages. `avoid` lists questions the student has already seen,
+ * so the AI moves on to untested parts of the notes, or new formats once they're covered. */
 export async function generateQuizQuestions(params: {
   pages: QuizSourcePage[];
   difficulty: Difficulty;
   count: number;
+  avoid?: string[];
   geminiDeadlineMs?: number;
 }): Promise<GeneratedQuizQuestion[]> {
-  const { pages, difficulty, count } = params;
+  const { pages, difficulty, count, avoid = [] } = params;
   // A single-source-page quiz needs no page attribution from the model at all — every question
   // trivially belongs to that one page. Asking the model to identify a source page only makes
   // sense (and is only reliable) once there's more than one to choose between, and even then an
   // index into a numbered list holds up far better than asking it to echo a title string exactly.
   const multiPage = pages.length > 1;
   const text = await writeQuizJson({
-    prompt: (maxChars) => buildQuizPrompt(buildNotes(pages, multiPage, maxChars), difficulty, count, multiPage),
+    // The history gets at most a quarter of the budget; the notes always get the rest.
+    prompt: (maxChars) => {
+      const avoidText = buildAvoid(avoid, Math.floor(maxChars / 4));
+      return buildQuizPrompt(
+        buildNotes(pages, multiPage, maxChars - avoidText.length),
+        difficulty,
+        count,
+        multiPage,
+        avoidText,
+      );
+    },
     multiPage,
     questionCount: count,
     geminiDeadlineMs: params.geminiDeadlineMs,

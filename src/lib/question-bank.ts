@@ -26,6 +26,71 @@ export function contentHash(text: string) {
   return createHash("sha256").update(text).digest("hex").slice(0, 24);
 }
 
+/** Matches the same question across the bank and past quizzes (quizzes copy the bank's text). */
+export function questionKey(text: string) {
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export interface PastQuestion {
+  questionText: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string | null;
+  sourcePageId: string;
+}
+
+/**
+ * What this user has already been asked from these pages, judged by their latest attempt at each
+ * question: `seen` holds every question asked (to skip when drawing fresh ones), `asked` their text
+ * newest first (so the AI can steer clear of it), and `missed` the ones last answered wrong or
+ * skipped in a submitted quiz (worth asking again).
+ */
+export async function loadQuizHistory(userId: string, pageIds: string[]) {
+  const rows = await prisma.quizQuestion.findMany({
+    where: { sourcePageId: { in: pageIds }, quiz: { userId } },
+    select: {
+      questionText: true,
+      options: true,
+      correctAnswer: true,
+      explanation: true,
+      sourcePageId: true,
+      isCorrect: true,
+      quiz: { select: { status: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 1000,
+  });
+
+  const seen = new Set<string>();
+  const asked: string[] = [];
+  const missed: PastQuestion[] = [];
+  for (const r of rows) {
+    const key = questionKey(r.questionText);
+    if (seen.has(key)) continue; // only the latest attempt counts
+    seen.add(key);
+    asked.push(r.questionText);
+    if (r.quiz.status === "completed" && r.isCorrect !== true && r.sourcePageId) {
+      missed.push({
+        questionText: r.questionText,
+        options: r.options as string[],
+        correctAnswer: r.correctAnswer,
+        explanation: r.explanation,
+        sourcePageId: r.sourcePageId,
+      });
+    }
+  }
+  return { seen, asked, missed };
+}
+
+/** How many banked questions at this difficulty, for the pages' current versions, the user hasn't seen. */
+export async function countUnseen(hashes: Map<string, string>, difficulty: Difficulty, seen: Set<string>) {
+  const rows = await prisma.bankQuestion.findMany({
+    where: { pageId: { in: [...hashes.keys()] }, difficulty },
+    select: { pageId: true, contentHash: true, questionText: true },
+  });
+  return rows.filter((r) => r.contentHash === hashes.get(r.pageId) && !seen.has(questionKey(r.questionText))).length;
+}
+
 /**
  * Writes a fresh bank for a page if its current content doesn't have one yet. Safe to call often
  * (after every save): it returns quickly unless a refresh is actually due. Never throws.
@@ -98,7 +163,9 @@ export interface DrawnQuestion {
 /**
  * Picks up to `count` banked questions for a quiz, spread across the pages (round-robin),
  * least recently used first. `hashes` maps each page to its current content hash.
- * With `fallback`, questions from older page versions and other difficulties can fill gaps.
+ * Questions in `seen` (by questionKey) are skipped, so the user isn't asked the same thing twice.
+ * With `fallback`, questions from older page versions and other difficulties can fill gaps, and
+ * seen ones come last rather than being skipped — a repeat beats no quiz during an AI outage.
  */
 export async function drawFromBank(params: {
   hashes: Map<string, string>;
@@ -106,8 +173,9 @@ export async function drawFromBank(params: {
   count: number;
   fallback?: boolean;
   exclude?: Set<string>;
+  seen?: Set<string>;
 }): Promise<DrawnQuestion[]> {
-  const { hashes, difficulty, count, fallback = false, exclude = new Set() } = params;
+  const { hashes, difficulty, count, fallback = false, exclude = new Set(), seen = new Set() } = params;
   const pageIds = [...hashes.keys()];
   const rows = await prisma.bankQuestion.findMany({
     where: { pageId: { in: pageIds }, ...(fallback ? {} : { difficulty }) },
@@ -117,9 +185,15 @@ export async function drawFromBank(params: {
   // Best first: current version + right difficulty, then (fallback only) current version at other
   // difficulties, then older versions.
   const rank = (r: (typeof rows)[number]) =>
-    (r.contentHash === hashes.get(r.pageId) ? 0 : 2) + (r.difficulty === difficulty ? 0 : 1);
+    (seen.has(questionKey(r.questionText)) ? 4 : 0) +
+    (r.contentHash === hashes.get(r.pageId) ? 0 : 2) +
+    (r.difficulty === difficulty ? 0 : 1);
   const usable = rows
-    .filter((r) => !exclude.has(r.id) && (fallback || r.contentHash === hashes.get(r.pageId)))
+    .filter(
+      (r) =>
+        !exclude.has(r.id) &&
+        (fallback || (r.contentHash === hashes.get(r.pageId) && !seen.has(questionKey(r.questionText)))),
+    )
     .sort((a, b) => rank(a) - rank(b));
 
   const byPage = new Map<string, typeof usable>();
@@ -153,11 +227,13 @@ export async function markBankQuestionsUsed(ids: string[]) {
   await prisma.bankQuestion.updateMany({ where: { id: { in: ids } }, data: { lastUsedAt: new Date() } });
 }
 
-/** Saves questions written live for a quiz into their pages' banks, so they can be reused. */
+/** Saves questions written live into their pages' banks, so they can be reused. `used` marks them
+ * as just asked (written for a quiz) rather than waiting for the next one (written ahead). */
 export async function saveLiveQuestionsToBank(
   questions: { questionText: string; options: string[]; correctAnswer: string; explanation: string; sourcePageId: string | null }[],
   difficulty: Difficulty,
   hashes: Map<string, string>,
+  { used = true }: { used?: boolean } = {},
 ) {
   const rows = questions.flatMap((q) => {
     const hash = q.sourcePageId ? hashes.get(q.sourcePageId) : undefined;
@@ -171,7 +247,7 @@ export async function saveLiveQuestionsToBank(
             options: q.options,
             correctAnswer: q.correctAnswer,
             explanation: q.explanation,
-            lastUsedAt: new Date(), // just used in this quiz
+            lastUsedAt: used ? new Date() : null,
           },
         ]
       : [];

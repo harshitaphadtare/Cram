@@ -38,7 +38,10 @@ const RULES: [language: string, test: (code: string) => boolean][] = [
   ["rust", (c) => /\bfn\s+\w+\s*\(/.test(c) && /\b(?:let\s+mut|->|impl|pub\s+fn|println!)/.test(c)],
   ["typescript", (c) => /\b(?:interface\s+\w+\s*\{|type\s+\w+\s*=|:\s*(?:string|number|boolean|void)\b|as\s+const\b)/.test(c)],
   ["javascript", (c) => /\b(?:const|let|var)\s+\w+\s*=|\bfunction\s*\w*\s*\(|=>|console\.log\(|require\(|\bimport\s+.+\s+from\s+['"]|export\s+(?:default|const|function)/.test(c)],
-  ["css", (c) => /^\s*(?:[.#]?[\w-]+(?:\s*[,>+~]?\s*[.#]?[\w-]+)*|:root|@media[^{]*)\s*\{[^}]*[\w-]+\s*:[^}]*\}/m.test(c)],
+  // Selector parts must be split by a real separator (space, combinator or "."/"#"). With every
+  // separator optional, a line of plain words could be split exponentially many ways, and a
+  // 40-character sentence in a Plain Text code block froze the whole page.
+  ["css", (c) => /^\s*(?:[.#]?[\w-]+(?:(?:\s*[,>+~]\s*|\s+)[.#]?[\w-]+|[.#][\w-]+)*|:root|@media[^{]*)\s*\{[^}]*[\w-]+\s*:[^}]*\}/m.test(c)],
   ["yaml", (c) => /^[\w-]+:\s*(?:\S.*)?$/m.test(c) && /^\s+[\w-]+:|^\s*-\s+\S/m.test(c) && !/[{};]/.test(c)],
 ];
 
